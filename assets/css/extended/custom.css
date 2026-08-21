@@ -150,7 +150,8 @@ body {
 }
 
 .post-entry {
-    padding: 0 0 var(--gap) 0;
+    padding: 0;
+    margin-bottom: var(--gap);
     background: transparent;
     border: none;
     border-radius: 0;
