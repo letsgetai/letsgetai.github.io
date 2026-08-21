@@ -1,7 +1,7 @@
 ---
-title: "关于"
+title: "About"
 ---
 
-算法工程师，关注大模型、Agent、强化学习、AI Infra。
+Algorithm engineer working on large language models, AI agents, and reinforcement learning.
 
-本站用 Hugo + PaperMod 搭建，内容以技术调研与实验分享为主。
+This site is built with Hugo and PaperMod. It contains technical research notes and experiment write-ups.

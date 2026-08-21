@@ -1,13 +1,13 @@
 baseURL = "https://letsgetai.github.io/"
 languageCode = "zh-cn"
-title = "胡权的技术博客"
+title = "Lets Get AI"
 theme = "PaperMod"
 
 enableRobotsTXT = true
 enableEmoji = true
 
 [params]
-  description = "AI / Agent / RL 技术调研与实验分享"
+  description = "Notes on LLMs, agents, RL and AI infrastructure"
   author = "胡权"
   DateFormat = "2006-01-02"
   defaultTheme = "auto"
@@ -19,8 +19,8 @@ enableEmoji = true
   ShowWordCount = true
 
   [params.homeInfoParams]
-    Title = "胡权"
-    Content = "算法工程师，关注大模型、Agent、强化学习。这里记录技术调研与实验分享。"
+    Title = "Lets Get AI"
+    Content = "Algorithm engineer writing about large language models, AI agents, reinforcement learning, and AI infrastructure. Research notes and experiment write-ups."
 
   [params.assets]
     disableHLJS = true
