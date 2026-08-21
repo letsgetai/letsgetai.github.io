@@ -111,6 +111,12 @@ categories: ["AI Infrastructure"]
 - 用**持久化栈（persistent stack）**维护语法状态，避免每次重新解析前缀。
 - 把这些计算放到 **CPU 上执行**，与 GPU 前向**重叠执行**（overlap with GPU execution）——mask 计算不再是 GPU 的串行依赖。
 
+![XGrammar 将 mask 生成和模型推理重叠](/images/constrained-decoding/xgrammar-figure-8.svg)
+
+*图：XGrammar 把 mask cache 构建与 prefill、mask 生成与 decoding 重叠。来自 [XGrammar Figure 8](https://arxiv.org/abs/2411.15100)，CC BY-SA 4.0。*
+
+关键不在于 mask 消失了，而在于它只依赖上一步 token、主要跑在 CPU；模型前向也只依赖上一步 token、主要跑在 GPU。因此两者可以并行，到 sampling 前才同步。只有 mask 计算没有超过 GPU 前向时间时，约束的端到端开销才会接近零。
+
 **证据与判断**：论文报告约束计算最高约 100x 加速、接近零开销；它已成为 vLLM、SGLang 的默认结构化生成引擎之一，也是后文“约束 × 投机”实现的关键组件。数字为论文公开报告值，跨场景外推需自行复测。
 
 ---
@@ -137,6 +143,12 @@ categories: ["AI Infrastructure"]
 3. **第三点（对应开头反事实）**：约束解码的实际速度比无约束解码**更低**——这是反事实成立的前提。DOMINO 引入投机解码后，加速**本质上来自投机解码**（草稿模型猜 + 目标模型并行验证），不是来自约束本身；约束在这里的作用是**在草稿上做约束引导的修正**，把非法 draft 过滤掉。需要诚实说明：DOMINO 没有和“纯投机解码（无约束）”做对比——投机解码在无约束场景下本身就有 2.2～3 倍加速，DOMINO 约束+投机比这个要慢。换句话说，约束让投机解码的收益打折了，但它让“约束解码”从必然更慢变成了能吃到投机加速。
 
 **证据与判断**：论文报告约束解码几乎零开销（near-zero overhead），部分场景比无约束解码还能近 2 倍加速。数字为论文报告值；但结论要定界：这个加速是“约束 + 投机”相对“无约束普通解码”的，不是相对“纯投机解码”的——后者的对比在论文里没有做，DOMINO 确实比纯投机慢。DOMINO 的核心贡献是把“约束”从每步串行查询变成了与投机验证并行的掩码。
+
+![DOMINO 中 speculative token 数与吞吐的关系](/images/constrained-decoding/domino-figure-5.svg)
+
+*图：不同 speculative token 数下，带/不带 schema 的 JSON 生成吞吐。来自 [DOMINO Figure 5](https://arxiv.org/abs/2403.06988)，CC BY 4.0。*
+
+这张图补的是一个容易被口头叙述掩盖的事实：投机长度 `k` 不是固定越大越好，收益会随 grammar 和草稿可预测性改变。它支持“约束场景也能吃到投机加速”，但不构成约束组合优于纯投机解码的证据——论文没有做那组直接对照。
 
 **DOMINO 与前面工作的关系**
 
