@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>AI Infrastructure on The Herta</title><link>https://letsgetai.github.io/categories/ai-infrastructure/</link><description>Recent content in AI Infrastructure on The Herta</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 21 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://letsgetai.github.io/categories/ai-infrastructure/index.xml" rel="self" type="application/rss+xml"/><item><title>用 Agent 做 DSL 算子的结构级优化：现在能做到什么程度</title><link>https://letsgetai.github.io/posts/dsl-operator-agent-optimization/</link><pubDate>Fri, 21 Aug 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/dsl-operator-agent-optimization/</guid><description>Agent 已能对结构清晰、参考实现明确的算子稳定拿到 2-5x 加速；量化与复杂融合仍未解决。</description></item><item><title>注意力内核进化史：FlashAttention 系列与 Flash Linear Attention</title><link>https://letsgetai.github.io/posts/flash-attention-evolution/</link><pubDate>Tue, 11 Aug 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/flash-attention-evolution/</guid><description>&lt;h2 id="一句话结论"&gt;一句话结论&lt;/h2&gt;
+&lt;p&gt;FlashAttention 系列解决了&amp;quot;标准 attention 在 GPU 上跑不快&amp;quot;的系统问题——不改数学、不牺牲精度，靠 tiling（分块）和 IO-aware（感知内存层次）设计把 attention 推向硬件极限；Flash Linear Attention（FLA）系列则用同样的分块思想，把理论 O(N) 的线性 RNN 内核也提速到超越 FlashAttention。两条线在&amp;quot;长上下文高效序列建模&amp;quot;上汇合，共同构成了今天大模型长上下文能力的底层基础设施。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;先说清一个名字：&lt;strong&gt;FlashAttention&lt;/strong&gt; 是一系列论文（2022–2024），优化的是标准的 softmax attention；&lt;strong&gt;Flash Linear Attention（FLA）&lt;/strong&gt; 是一个开源项目（2024 起），优化的是线性 attention / 线性 RNN。两者共享&amp;quot;分块 + 避免 HBM 往返&amp;quot;的思想，但不是同一个东西。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2 id="为什么-attention-慢gpu-内存层次是第一瓶颈"&gt;为什么 attention 慢：GPU 内存层次是第一瓶颈&lt;/h2&gt;
+&lt;p&gt;标准 attention 需要计算 QK^T，时间与内存都随序列长度 N 二次增长。但很多人忽略一个更实际的问题：&lt;strong&gt;GPU 上跑的慢，往往不是算得慢，而是搬数据搬得慢&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;GPU 内存是分层的：HBM（高带宽内存，容量大但慢）和片上 SRAM（容量小但快）。朴素实现把 N×N 的注意力矩阵完整写进 HBM 再读回来，大量时间花在内存搬运上，而不是矩阵乘上。&lt;/p&gt;
+&lt;p&gt;FlashAttention 系列盯住的就是这个&amp;quot;内存搬运&amp;quot;问题，用一句话概括它的核心策略：&lt;strong&gt;把中间结果留在离计算单元最近的地方，绝不落盘到 HBM&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;先给出标准 attention 的数学形式，后面所有优化都是围绕它展开的：&lt;/p&gt;
+$$
+\text{Attention}(Q,K,V) = \text{softmax}\left(\frac{QK^\top}{\sqrt{d}}\right)V, \quad S = QK^\top \in \mathbb{R}^{N \times N}
+$$&lt;p&gt;其中 (Q, K, V) 是查询、键、值矩阵，(N) 是序列长度，(d) 是每个头的维度。问题在于中间矩阵 (S) 是 (N \times N)，序列变长时它主导了内存和时间。&lt;/p&gt;</description></item></channel></rss>
