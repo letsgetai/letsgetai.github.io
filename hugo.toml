@@ -1,6 +1,6 @@
 baseURL = "https://letsgetai.github.io/"
 languageCode = "zh-cn"
-title = "Lets Get AI"
+title = "The Herta"
 theme = "PaperMod"
 
 enableRobotsTXT = true
@@ -17,12 +17,7 @@ enableEmoji = true
   ShowBreadCrumbs = true
   ShowCodeCopyButtons = true
   ShowWordCount = true
-
-  [params.homeInfoParams]
-    Title = "Lets Get AI"
-    Content = "Algorithm engineer writing about large language models, AI agents, reinforcement learning, and AI infrastructure. Research notes and experiment write-ups."
-
-  [params.assets]
+[params.assets]
     disableHLJS = true
 
   [params.fuseOpts]
