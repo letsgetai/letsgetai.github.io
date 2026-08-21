@@ -1,0 +1,4 @@
+#!/bin/sh
+# pre-commit: 博客格式体检（scripts/check-posts.py），不过不允许提交
+cd "$(git rev-parse --show-toplevel)" || exit 1
+python3 scripts/check-posts.py || exit 1
