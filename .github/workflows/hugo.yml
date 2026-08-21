@@ -9,7 +9,16 @@ permissions:
   contents: write
 
 jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run format checks (quotes, bold, bare URLs, link liveness)
+        run: python3 scripts/check-posts.py
+
   build-deploy:
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
