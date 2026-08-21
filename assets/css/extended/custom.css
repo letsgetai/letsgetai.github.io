@@ -185,8 +185,8 @@ body {
 
 /* Karpathy-style code blocks (karpathy.github.io main.css) */
 .post-content pre {
-    background-color: #eef !important;
-    border: 1px solid #d5d5e9;
+    background-color: #f6f8fa !important;
+    border: 1px solid #d0d7de;
     border-radius: 3px;
     padding: 8px 12px;
     font-size: 15px;
@@ -194,8 +194,8 @@ body {
 }
 
 .post-content code {
-    background-color: #eef;
-    border: 1px solid #d5d5e9;
+    background-color: #f6f8fa;
+    border: 1px solid #d0d7de;
     border-radius: 3px;
     padding: 1px 5px;
 }
