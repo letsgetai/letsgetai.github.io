@@ -14,6 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: markdownlint
+        run: npx --yes markdownlint-cli2 --config .markdownlint.yaml content/posts
       - name: Run format checks (quotes, bold, bare URLs, link liveness)
         run: python3 scripts/check-posts.py
 

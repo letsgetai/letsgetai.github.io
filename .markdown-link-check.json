@@ -1,0 +1,7 @@
+{
+  "ignorePatterns": [
+    { "pattern": "^#" }
+  ],
+  "timeout": "30s",
+  "retryCount": 3
+}

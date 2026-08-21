@@ -1,0 +1,12 @@
+# 中文技术博客 markdownlint 配置
+default: true
+MD013: false          # 行长度（中文长行不限制）
+MD033: false          # 内联 HTML（KaTeX/mermaid 需要）
+MD024: false          # 标题重复（各节小标题允许）
+MD026: false          # 标题行尾标点（中文允许）
+MD041: false          # 首行必须是标题（front matter 场景）
+MD040: true           # 代码块必须带语言标注
+MD034: true           # 裸 URL 必须转链接
+MD049: true           # 强调样式一致
+MD050: true           # 强调样式一致
+MD036: false          # 加粗作为小节标签（当前文章风格）

@@ -160,7 +160,7 @@ TFLA 引入"chunk 内的额外一层序列并行"，让 chunk size 可以任意�
 ## 两条线的关键差异
 
 | 维度 | FlashAttention 1/2/3 | FLA / TFLA |
-|---|---|---|
+| --- | --- | --- |
 | 目标 | 让标准 softmax attention 更快 | 让线性 attention / 线性 RNN 更快 |
 | 数学 | 精确，与标准 attention 一致 | 本身是近似（线性化内核），追求与完整 attention 精度接近 |
 | 瓶颈 | HBM 与 SRAM 的 IO | 同样 IO，外加 chunk 并行度与中间状态物化 |

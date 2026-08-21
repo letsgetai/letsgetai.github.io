@@ -1,0 +1,13 @@
+repos:
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.23.0
+    hooks:
+      - id: markdownlint-cli2
+        args: [--config, .markdownlint.yaml]
+  - repo: local
+    hooks:
+      - id: check-posts
+        name: Blog format check (Chinese quotes, fences, links)
+        entry: python3 scripts/check-posts.py
+        language: system
+        files: ^content/posts/.*\.md$
