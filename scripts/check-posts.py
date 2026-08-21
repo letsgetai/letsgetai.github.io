@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""博客文章格式体检：上传前必跑。检查语法配对、旧式分隔符、裸 URL、链接可达性。"""
+"""博客文章格式体检：上传前必跑。检查语法配对、代码块标注、裸 URL、链接可达性。"""
 import glob, os, re, sys, urllib.request, urllib.error
 
 BS = chr(92)
+BT = chr(96)
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ALL_OK = True
 
@@ -29,24 +30,38 @@ for f in sorted(glob.glob(os.path.join(ROOT, "content/posts/*.md"))):
     LQ = chr(0x201C); RQ = chr(0x201D)
     if body.count(LQ) != body.count(RQ):
         issues.append("中文引号“”不配对")
-    mixed = re.findall(LQ + "[^" + RQ + "]*" + chr(34), body)
-    mixed += re.findall(chr(34) + "[^" + RQ + "]*" + RQ, body)
+    body_clean = re.sub(BT + "[^" + BT + "]*" + BT, "", body)
+    mixed = re.findall(LQ + "[^" + RQ + "]*" + chr(34), body_clean)
+    mixed += re.findall(chr(34) + "[^" + RQ + "]*" + RQ, body_clean)
     if mixed:
         issues.append("引号混用（中文引号对里夹英文引号）")
 
-    if c.count(chr(96)) % 2 != 0:
+    if c.count(BT) % 2 != 0:
         issues.append("反引号不配对")
 
     if (BS + "(") in c or (BS + "[") in c:
         issues.append("旧式分隔符 " + BS + "( / " + BS + "[")
 
-    ws = " \t\n、，。；）)（([]" + chr(39) + chr(34) + chr(96)
+    ws = " \t\n、，。；）)（([]" + chr(39) + chr(34) + BT
     url_re = re.compile("https?://[^" + ws + "]+")
     for m in url_re.finditer(c):
         start = m.start()
         if start >= 2 and c[start-2:start] == "](":
             continue
         issues.append("裸URL: " + m.group()[:60])
+
+    fence_count = 0
+    pos = 0
+    while True:
+        fence = c.find(BT*3, pos)
+        if fence == -1: break
+        fence_count += 1
+        line_end = c.find(chr(10), fence)
+        rest = c[fence+3:line_end if line_end > -1 else len(c)]
+        if fence_count % 2 == 1 and rest.strip() == "":
+            line_no = c[:fence].count(chr(10)) + 1
+            issues.append("代码块无语言标注（第 " + str(line_no) + " 行）: " + BT*3 + " 后应跟语言如 text/python")
+        pos = fence + 3
 
     if c.startswith("---"):
         fm = parts[1] if len(parts) >= 2 else ""
@@ -55,20 +70,6 @@ for f in sorted(glob.glob(os.path.join(ROOT, "content/posts/*.md"))):
         for k in ["title", "date", "draft"]:
             if k + ":" not in fm:
                 issues.append("front matter 缺 " + k)
-
-    # 7. 代码块语言标注（opening fence 必须带语言，如 ```text）
-    BT3 = chr(96) * 3
-    fence_count = 0
-    pos = 0
-    while True:
-        fence = c.find(BT3, pos)
-        if fence == -1: break
-        fence_count += 1
-        line_end = c.find(chr(10), fence)
-        rest = c[fence+3:line_end if line_end > -1 else len(c)]
-        if fence_count % 2 == 1 and rest.strip() == '':
-            issues.append('代码块无语言标注（第 ' + str(c[:fence].count(chr(10))+1) + ' 行）: ' + BT3 + ' 后应跟语言如 text/python')
-        pos = fence + 3
 
     report(name, issues)
 
