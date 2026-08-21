@@ -2,6 +2,7 @@
 title: "用 Agent 做 DSL 算子的结构级优化：现在能做到什么程度"
 date: 2026-08-21
 draft: false
+categories: ["AI Infrastructure"]
 summary: "Agent 已能对结构清晰、参考实现明确的算子稳定拿到 2-5x 加速；量化与复杂融合仍未解决。"
 ---
 

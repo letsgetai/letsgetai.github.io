@@ -2,6 +2,7 @@
 title: "注意力内核进化史：FlashAttention 系列与 Flash Linear Attention"
 date: 2026-08-11
 draft: false
+categories: ["AI Infrastructure"]
 ---
 
 ## 一句话结论
