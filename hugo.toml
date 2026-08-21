@@ -8,7 +8,7 @@ enableEmoji = true
 
 [params]
   description = "Notes on LLMs, agents, RL and AI infrastructure"
-  author = "胡权"
+  author = "LetsGetAI"
   DateFormat = "2006-01-02"
   defaultTheme = "auto"
   ShowReadingTime = true
