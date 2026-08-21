@@ -33,7 +33,7 @@ categories: ["AI Infrastructure"]
 ### Grid Beam Search（Hokamp & Liu, ACL 2017）
 
 - 论文：*Lexically Constrained Decoding for Sequence Generation Using Grid Beam Search*
-- 链接：https://aclanthology.org/P17-1141/ 、 arXiv:1704.07138
+- 链接：[https://aclanthology.org/P17-1141/](https://aclanthology.org/P17-1141/) 、 arXiv:1704.07138
 
 **方法**
 
@@ -46,7 +46,7 @@ categories: ["AI Infrastructure"]
 ### Outlines（Willard & Louf, 2023）
 
 - 论文：*Efficient Guided Generation for Large Language Models*
-- 链接：https://arxiv.org/abs/2307.09702
+- 链接：[https://arxiv.org/abs/2307.09702](https://arxiv.org/abs/2307.09702)
 
 **方法**
 
@@ -64,7 +64,7 @@ categories: ["AI Infrastructure"]
 ### Grammar-Constrained Decoding（Geng et al., EMNLP 2023）
 
 - 论文：*Grammar-Constrained Decoding for Structured NLP Tasks without Finetuning*
-- 链接：https://arxiv.org/abs/2305.13971 、 https://aclanthology.org/2023.emnlp-main.674/
+- 链接：[https://arxiv.org/abs/2305.13971](https://arxiv.org/abs/2305.13971) 、 [https://aclanthology.org/2023.emnlp-main.674/](https://aclanthology.org/2023.emnlp-main.674/)
 
 **方法**
 
@@ -86,7 +86,7 @@ categories: ["AI Infrastructure"]
 ### SGLang（Zheng et al., NeurIPS 2024）
 
 - 论文：*SGLang: Efficient Execution of Structured Language Model Programs*
-- 链接：https://arxiv.org/abs/2312.07104
+- 链接：[https://arxiv.org/abs/2312.07104](https://arxiv.org/abs/2312.07104)
 
 **方法**
 
@@ -103,7 +103,7 @@ categories: ["AI Infrastructure"]
 ### XGrammar（MLSys 2025）
 
 - 论文：*XGrammar: Flexible, Efficient and Provably Correct Structured Generation*
-- 链接：https://arxiv.org/abs/2411.15100
+- 链接：[https://arxiv.org/abs/2411.15100](https://arxiv.org/abs/2411.15100)
 
 **方法**
 
@@ -117,12 +117,12 @@ categories: ["AI Infrastructure"]
 
 ## 三、约束解码 × 投机解码：DOMINO 怎么解决"错位"
 
-投机解码（speculative decoding）是另一个独立主线：草稿模型快速生成候选，目标模型一次前向并行验证，不改变输出分布（Leviathan et al., ICML 2023，https://arxiv.org/abs/2211.17192）。DOMINO 是这两条线的交汇点。
+投机解码（speculative decoding）是另一个独立主线：草稿模型快速生成候选，目标模型一次前向并行验证，不改变输出分布（Leviathan et al., ICML 2023，[https://arxiv.org/abs/2211.17192](https://arxiv.org/abs/2211.17192)）。DOMINO 是这两条线的交汇点。
 
 ### DOMINO（Kang et al., ICML 2024）
 
 - 论文：*Efficient Constrained Decoding via Fully Subword-Aware Masking and Speculative Decoding*
-- 链接：https://arxiv.org/abs/2403.06988
+- 链接：[https://arxiv.org/abs/2403.06988](https://arxiv.org/abs/2403.06988)
 
 **它解决的问题**
 
@@ -186,7 +186,7 @@ DOMINO 之后，"约束 + 投机"成为结构化生成的主流方向。下面�
 ### SketchGCD（ACL 2024）
 
 - 论文：*Sketch-Guided Constrained Decoding for Few-shot Text Generation*
-- 链接：https://aclanthology.org/2024.acl-short.23/
+- 链接：[https://aclanthology.org/2024.acl-short.23/](https://aclanthology.org/2024.acl-short.23/)
 
 **方法**：先让模型生成一个不含约束的草稿（sketch），再在草稿上做约束引导的修正，避免每步都查 FSM；扩展到黑盒 LLM 场景。
 
@@ -195,7 +195,7 @@ DOMINO 之后，"约束 + 投机"成为结构化生成的主流方向。下面�
 ### JSONSchemaBench（2025）
 
 - 论文：*Evaluating Constrained Decoding for Structured Outputs*
-- 链接：https://arxiv.org/abs/2501.10868
+- 链接：[https://arxiv.org/abs/2501.10868](https://arxiv.org/abs/2501.10868)
 
 **方法**：这是一个约束解码框架的系统评测，对比了 vLLM、SGLang、Outlines、XGrammar 等主流实现，在**同一批 JSON Schema 任务**上测三件事：正确率（是否严格满足 schema）、延迟、吞吐。
 
@@ -206,7 +206,7 @@ DOMINO 之后，"约束 + 投机"成为结构化生成的主流方向。下面�
 
 ### XGrammar-2（2026-05）
 
-- 链接：https://blog.mlc.ai/2026/05/04/xgrammar-2-fast-customizable-structured-generation
+- 链接：[https://blog.mlc.ai/2026/05/04/xgrammar-2-fast-customizable-structured-generation](https://blog.mlc.ai/2026/05/04/xgrammar-2-fast-customizable-structured-generation)
 
 **它解决的问题**：XGrammar 已经把单次约束计算的代价降到接近零，但**投机解码场景下约束计算次数爆炸**：投机解码会生成一棵候选树（多个草稿分支），每个候选节点都要查一次"该状态下哪些 token 合法"。树的宽度 × 深度次查询，即使单次很快，总量也可观；而且不同节点可能处于相同/相似的 FSM 状态，重复计算浪费明显。
 
@@ -237,7 +237,7 @@ DOMINO 之后，"约束 + 投机"成为结构化生成的主流方向。下面�
 
 ### vLLM PR #14702：Structured Outputs + Speculative Decoding
 
-- 链接：https://github.com/vllm-project/vllm/pull/14702 （2025-04 合并）
+- 链接：[https://github.com/vllm-project/vllm/pull/14702](https://github.com/vllm-project/vllm/pull/14702) （2025-04 合并）
 
 **做了什么**：让 vLLM 支持结构化输出的投机解码——draft token 按 grammar 验证，非法 draft 直接丢弃，合法 draft 进入并行验证。
 
@@ -249,7 +249,7 @@ DOMINO 之后，"约束 + 投机"成为结构化生成的主流方向。下面�
 
 ### SGLang PR #13425：Spec V2 + XGrammar 同时启用
 
-- 链接：https://github.com/sgl-project/sglang/pull/13425 （2025-11 合并）
+- 链接：[https://github.com/sgl-project/sglang/pull/13425](https://github.com/sgl-project/sglang/pull/13425) （2025-11 合并）
 
 **做了什么**：让 SGLang 的投机解码（Spec V2）与 XGrammar 约束解码同时启用，此前二者互斥；实现上把 XGrammar 的 mask 计算从 decode 关键路径移出/重叠，与投机解码的草稿验证并行。
 
@@ -257,7 +257,7 @@ DOMINO 之后，"约束 + 投机"成为结构化生成的主流方向。下面�
 
 ### XGrammar PR #490 / #613：投机解码树遍历的 mask 生成
 
-- 链接：https://github.com/mlc-ai/xgrammar/pull/490 （2025-12）、https://github.com/mlc-ai/xgrammar/pull/613 （2026-05）
+- 链接：[https://github.com/mlc-ai/xgrammar/pull/490](https://github.com/mlc-ai/xgrammar/pull/490) （2025-12）、[https://github.com/mlc-ai/xgrammar/pull/613](https://github.com/mlc-ai/xgrammar/pull/613) （2026-05）
 
 **做了什么**：PR #490 提出 `TraverseDraftTree`，对投机解码的候选树做单次 DFS 遍历，一次性为整棵树生成 grammar mask，而不是对每个候选节点单独查询；PR #613 把它正式暴露为 `GrammarMatcher` API（XGrammar-2 的树遍历能力即源于此）。
 
