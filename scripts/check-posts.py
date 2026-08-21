@@ -56,6 +56,20 @@ for f in sorted(glob.glob(os.path.join(ROOT, "content/posts/*.md"))):
             if k + ":" not in fm:
                 issues.append("front matter 缺 " + k)
 
+    # 7. 代码块语言标注（opening fence 必须带语言，如 ```text）
+    BT3 = chr(96) * 3
+    fence_count = 0
+    pos = 0
+    while True:
+        fence = c.find(BT3, pos)
+        if fence == -1: break
+        fence_count += 1
+        line_end = c.find(chr(10), fence)
+        rest = c[fence+3:line_end if line_end > -1 else len(c)]
+        if fence_count % 2 == 1 and rest.strip() == '':
+            issues.append('代码块无语言标注（第 ' + str(c[:fence].count(chr(10))+1) + ' 行）: ' + BT3 + ' 后应跟语言如 text/python')
+        pos = fence + 3
+
     report(name, issues)
 
 print()

@@ -152,7 +152,7 @@ categories: ["AI Infrastructure"]
 
 把两条线放在一起，真正的合并点在这里：
 
-```
+```text
 draft 模型快速生成候选 token
         ↓
 约束过滤器（grammar mask）滤掉非法 draft —— 大部分乱猜的 token 在这一步就被挡掉
