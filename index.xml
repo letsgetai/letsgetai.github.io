@@ -1,1 +1,41 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>The Herta</title><link>https://letsgetai.github.io/</link><description>Recent content on The Herta</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 21 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://letsgetai.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>用 Agent 做 DSL 算子的结构级优化：现在能做到什么程度</title><link>https://letsgetai.github.io/posts/dsl-operator-agent-optimization/</link><pubDate>Fri, 21 Aug 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/dsl-operator-agent-optimization/</guid><description>Agent 已能对结构清晰、参考实现明确的算子稳定拿到 2-5x 加速；量化与复杂融合仍未解决。</description></item><item><title>About</title><link>https://letsgetai.github.io/about/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/about/</guid><description>&lt;p&gt;&lt;a href="https://github.com/letsgetai"&gt;GitHub&lt;/a&gt;&lt;/p&gt;</description></item></channel></rss>
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>The Herta</title><link>https://letsgetai.github.io/</link><description>Recent content on The Herta</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 21 Aug 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://letsgetai.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>用 Agent 做 DSL 算子的结构级优化：现在能做到什么程度</title><link>https://letsgetai.github.io/posts/dsl-operator-agent-optimization/</link><pubDate>Fri, 21 Aug 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/dsl-operator-agent-optimization/</guid><description>Agent 已能对结构清晰、参考实现明确的算子稳定拿到 2-5x 加速；量化与复杂融合仍未解决。</description></item><item><title>注意力内核进化史：FlashAttention 系列与 Flash Linear Attention</title><link>https://letsgetai.github.io/posts/flash-attention-evolution/</link><pubDate>Tue, 11 Aug 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/flash-attention-evolution/</guid><description>&lt;h2 id="一句话结论"&gt;一句话结论&lt;/h2&gt;
+&lt;p&gt;FlashAttention 系列解决了&amp;quot;标准 attention 在 GPU 上跑不快&amp;quot;的系统问题——不改数学、不牺牲精度，靠 tiling（分块）和 IO-aware（感知内存层次）设计把 attention 推向硬件极限；Flash Linear Attention（FLA）系列则用同样的分块思想，把理论 O(N) 的线性 RNN 内核也提速到超越 FlashAttention。两条线在&amp;quot;长上下文高效序列建模&amp;quot;上汇合，共同构成了今天大模型长上下文能力的底层基础设施。&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;先说清一个名字：&lt;strong&gt;FlashAttention&lt;/strong&gt; 是一系列论文（2022–2024），优化的是标准的 softmax attention；&lt;strong&gt;Flash Linear Attention（FLA）&lt;/strong&gt; 是一个开源项目（2024 起），优化的是线性 attention / 线性 RNN。两者共享&amp;quot;分块 + 避免 HBM 往返&amp;quot;的思想，但不是同一个东西。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2 id="为什么-attention-慢gpu-内存层次是第一瓶颈"&gt;为什么 attention 慢：GPU 内存层次是第一瓶颈&lt;/h2&gt;
+&lt;p&gt;标准 attention 需要计算 QK^T，时间与内存都随序列长度 N 二次增长。但很多人忽略一个更实际的问题：&lt;strong&gt;GPU 上跑的慢，往往不是算得慢，而是搬数据搬得慢&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;GPU 内存是分层的：HBM（高带宽内存，容量大但慢）和片上 SRAM（容量小但快）。朴素实现把 N×N 的注意力矩阵完整写进 HBM 再读回来，大量时间花在内存搬运上，而不是矩阵乘上。&lt;/p&gt;
+&lt;p&gt;FlashAttention 系列盯住的就是这个&amp;quot;内存搬运&amp;quot;问题，用一句话概括它的核心策略：&lt;strong&gt;把中间结果留在离计算单元最近的地方，绝不落盘到 HBM&lt;/strong&gt;。&lt;/p&gt;
+&lt;p&gt;先给出标准 attention 的数学形式，后面所有优化都是围绕它展开的：&lt;/p&gt;
+$$
+\text{Attention}(Q,K,V) = \text{softmax}\left(\frac{QK^\top}{\sqrt{d}}\right)V, \quad S = QK^\top \in \mathbb{R}^{N \times N}
+$$&lt;p&gt;其中 (Q, K, V) 是查询、键、值矩阵，(N) 是序列长度，(d) 是每个头的维度。问题在于中间矩阵 (S) 是 (N \times N)，序列变长时它主导了内存和时间。&lt;/p&gt;</description></item><item><title>约束解码的生成：从逐 token 采样，到“知道下一步是什么”</title><link>https://letsgetai.github.io/posts/constrained-decoding/</link><pubDate>Tue, 11 Aug 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/constrained-decoding/</guid><description>&lt;blockquote&gt;
+&lt;p&gt;生成一段 JSON 时，模型其实有 95% 的时间都在做&amp;quot;确定的重复&amp;quot;：&lt;code&gt;{&lt;/code&gt;、&lt;code&gt;&amp;quot;&lt;/code&gt;、字段名、&lt;code&gt;:&lt;/code&gt;、&lt;code&gt;}&lt;/code&gt;。真正需要模型&amp;quot;想&amp;quot;的，可能只有每个字段的值。那能不能告诉解码器：这些位置不用采样，直接填？如果再把&amp;quot;猜下一步&amp;quot;交给一个更快的草稿模型，生成会不会快好几倍？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;本文是围绕这个问题的技术分享，面向已经接触过 LLM 推理、想理解约束解码来龙去脉的读者。主线是：约束解码解决什么问题 → 方法如何一步步演进 → 关键证据支持哪些结论 → 实践中的经验与边界。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;核心猜想&lt;/strong&gt;：约束解码里大量内容是确定性重复（固定字段、括号、键名），能否把&amp;quot;确定的部分直接跳过采样、交给更快的前向&amp;quot;做成加速？这条主线贯穿全文，也是约束解码与投机解码（speculative decoding）能走到一起的原因。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id="问题与背景"&gt;问题与背景&lt;/h2&gt;
+&lt;p&gt;约束解码要解决的核心问题：&lt;strong&gt;输出必须满足结构约束&lt;/strong&gt;（正则、JSON Schema、CFG），且正确性要有保证，而不是&amp;quot;运气好碰对格式&amp;quot;。&lt;/p&gt;
+&lt;p&gt;约束解码与普通解码的差别在于，每一步都要回答&amp;quot;哪些 token 合法&amp;quot;。这个查询与 mask 本身有成本，于是出现两条演进方向：&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;&lt;strong&gt;约束怎么表达&lt;/strong&gt;：从&amp;quot;必须包含指定词&amp;quot;（集合级约束），到&amp;quot;必须匹配某种语法&amp;quot;（FSM 可判定的约束）。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;约束怎么不花钱&lt;/strong&gt;：从逐 token 串行查表，到预计算、跳确定部分、与 GPU 前向重叠、最后与投机解码并行验证。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;下文按&amp;quot;问题 → 方法 → 证据&amp;quot;展开，论文链接直接列在对应方法处。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id="一早期约束解码约束做进搜索过程"&gt;一、早期约束解码：约束做进搜索过程&lt;/h2&gt;
+&lt;p&gt;约束解码最早解决的问题是&amp;quot;输出必须包含某些指定内容&amp;quot;——不是格式合法，而是句子里必须出现某个词或短语。早期方法把约束做进 beam search 的搜索过程。&lt;/p&gt;
+&lt;h3 id="grid-beam-searchhokamp--liu-acl-2017"&gt;Grid Beam Search（Hokamp &amp;amp; Liu, ACL 2017）&lt;/h3&gt;
+&lt;ul&gt;
+&lt;li&gt;论文：&lt;em&gt;Lexically Constrained Decoding for Sequence Generation Using Grid Beam Search&lt;/em&gt;&lt;/li&gt;
+&lt;li&gt;链接：https://aclanthology.org/P17-1141/ 、 arXiv:1704.07138&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;方法&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;约束定义为&amp;quot;输出必须包含一组指定的短语/词&amp;quot;。&lt;/li&gt;
+&lt;li&gt;模型在 beam 上扩展时，额外维护一个&amp;quot;已覆盖约束&amp;quot;的状态，beam 排序优先覆盖更多约束的候选。&lt;/li&gt;
+&lt;li&gt;约束是集合级的&amp;quot;必须包含&amp;quot;，不要求前缀匹配，可以出现在输出任意位置。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;判断&lt;/strong&gt;：这一代方法把约束做进搜索，正确，但只覆盖&amp;quot;必须包含词&amp;quot;这一种约束，且 beam 扩展成本随约束数量上升。它的意义是确立了&amp;quot;约束进解码过程&amp;quot;的范式，而不是进训练或后处理。&lt;/p&gt;</description></item><item><title>About</title><link>https://letsgetai.github.io/about/</link><pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/about/</guid><description>&lt;p&gt;&lt;a href="https://github.com/letsgetai"&gt;GitHub&lt;/a&gt;&lt;/p&gt;</description></item></channel></rss>
