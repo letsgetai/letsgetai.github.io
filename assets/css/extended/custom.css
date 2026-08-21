@@ -138,13 +138,30 @@ body {
     line-height: 1.4;
 }
 
-/* unify first-entry with regular post cards */
+/* minimal list: no card borders */
 .first-entry {
     min-height: unset;
     justify-content: flex-start;
     margin: var(--gap) 0;
-    padding: var(--gap);
-    background: var(--entry);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+.post-entry {
+    padding: 0 0 var(--gap) 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+.post-entry:hover,
+.post-entry:focus-within {
+    transform: none;
+    border-color: transparent;
+}
+
+.list {
+    background: transparent;
 }
