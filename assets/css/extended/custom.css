@@ -125,3 +125,15 @@ body {
     font-size: 0.88em;
     color: var(--secondary);
 }
+
+/* homepage first-entry oversized title -> match subpage heading feel */
+.first-entry .entry-header h1,
+.first-entry .entry-header h2 {
+    font-size: 22px;
+    line-height: 1.4;
+}
+
+.entry-header h2 {
+    font-size: 20px;
+    line-height: 1.4;
+}
