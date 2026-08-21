@@ -182,3 +182,26 @@ body {
 }
 
 
+
+/* Karpathy-style code blocks (karpathy.github.io main.css) */
+.post-content pre {
+    background-color: #eef !important;
+    border: 1px solid #d5d5e9;
+    border-radius: 3px;
+    padding: 8px 12px;
+    font-size: 15px;
+    overflow: auto;
+}
+
+.post-content code {
+    background-color: #eef;
+    border: 1px solid #d5d5e9;
+    border-radius: 3px;
+    padding: 1px 5px;
+}
+
+.post-content pre code {
+    border: 0;
+    padding: 0;
+    background-color: transparent !important;
+}
