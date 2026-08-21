@@ -1,0 +1,45 @@
+baseURL = "https://letsgetai.github.io/"
+languageCode = "zh-cn"
+title = "胡权的技术博客"
+theme = "PaperMod"
+
+enableRobotsTXT = true
+enableEmoji = true
+
+[params]
+  description = "AI / Agent / RL 技术调研与实验分享"
+  author = "胡权"
+  DateFormat = "2006-01-02"
+  defaultTheme = "auto"
+  ShowReadingTime = true
+  ShowShareButtons = true
+  ShowPostNavLinks = true
+  ShowBreadCrumbs = true
+  ShowCodeCopyButtons = true
+  ShowWordCount = true
+
+  [params.homeInfoParams]
+    Title = "胡权"
+    Content = "算法工程师，关注大模型、Agent、强化学习。这里记录技术调研与实验分享。"
+
+  [params.assets]
+    disableHLJS = true
+
+  [params.fuseOpts]
+    isCaseSensitive = false
+
+[[menu.main]]
+    name = "首页"
+    url = "/"
+    weight = 1
+  [[menu.main]]
+    name = "归档"
+    url = "/archives/"
+    weight = 2
+  [[menu.main]]
+    name = "关于"
+    url = "/about/"
+    weight = 3
+
+[outputs]
+  home = ["HTML", "RSS", "JSON"]
