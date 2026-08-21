@@ -137,3 +137,14 @@ body {
     font-size: 20px;
     line-height: 1.4;
 }
+
+/* unify first-entry with regular post cards */
+.first-entry {
+    min-height: unset;
+    justify-content: flex-start;
+    margin: var(--gap) 0;
+    padding: var(--gap);
+    background: var(--entry);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+}
