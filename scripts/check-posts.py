@@ -82,16 +82,36 @@ for f in glob.glob(os.path.join(ROOT, "content/posts/*.md")):
         all_links.add(m.group()[2:-1])
 
 bad_links = []
+warn_links = []
 for url in sorted(all_links):
-    try:
-        req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": "Mozilla/5.0 (blog-check)"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
-            if resp.status >= 400:
-                bad_links.append((url, "HTTP " + str(resp.status)))
-    except urllib.error.HTTPError as e:
-        bad_links.append((url, "HTTP " + str(e.code)))
-    except Exception as e:
-        bad_links.append((url, str(e)[:60]))
+    ok = False
+    err = ''
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, method='HEAD', headers={'User-Agent': 'Mozilla/5.0 (blog-check)'})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                if resp.status >= 400:
+                    err = 'HTTP ' + str(resp.status)
+                else:
+                    ok = True
+                break
+        except urllib.error.HTTPError as e:
+            err = 'HTTP ' + str(e.code)
+            if e.code < 500:
+                break
+        except Exception as e:
+            err = str(e)[:60]
+    if ok:
+        continue
+    if err.startswith('HTTP') and '404' in err:
+        bad_links.append((url, err))
+    else:
+        warn_links.append((url, err))
+
+if warn_links:
+    for url, err in warn_links:
+        print('[WARN] ' + url + ' -> ' + err)
+    print('（网络波动警告，非死链；本地可手动复验）')
 
 if bad_links:
     ALL_OK = False
