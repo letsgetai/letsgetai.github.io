@@ -181,16 +181,4 @@ body {
     font-weight: 400;
 }
 
-/* code blocks: fixed light background regardless of theme */
-.post-content pre,
-.post-content pre code,
-.highlight pre,
-.highlight code {
-    background-color: #f6f8fa !important;
-    color: #24292e !important;
-}
 
-.post-content pre {
-    border: 1px solid #e1e4e8;
-    border-radius: 6px;
-}
