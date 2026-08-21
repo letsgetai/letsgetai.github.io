@@ -25,7 +25,7 @@ $$
 \text{Attention}(Q,K,V) = \text{softmax}\left(\frac{QK^\top}{\sqrt{d}}\right)V, \quad S = QK^\top \in \mathbb{R}^{N \times N}
 $$
 
-其中 \(Q, K, V\) 是查询、键、值矩阵，\(N\) 是序列长度，\(d\) 是每个头的维度。问题在于中间矩阵 \(S\) 是 \(N \times N\)，序列变长时它主导了内存和时间。
+其中 $Q, K, V$ 是查询、键、值矩阵，$N$ 是序列长度，$d$ 是每个头的维度。问题在于中间矩阵 $S$ 是 $N \times N$，序列变长时它主导了内存和时间。
 
 ## FlashAttention（2022）：IO-aware 的精确注意力
 
@@ -41,7 +41,7 @@ FlashAttention 用两个机制实现"精确 attention + 减少 HBM 访问"：
 
 **2. Online softmax（在线 softmax）**：标准 softmax 需要先看到整行才知道最大值和归一化项，分块后拿不到全局。FlashAttention 用"running maximum + running sum"的增量式更新：每个块到来时，用新的最大值重新缩放之前已累积的中间结果，最后统一归一化（Algorithm 1 第 10-12 行）。
 
-用公式看更清楚。对向量 \(x = (x^{(1)}, x^{(2)})\) 拆成两段分别做 softmax，再用各自的统计量合并：
+用公式看更清楚。对向量 $x = (x^{(1)}, x^{(2)})$ 拆成两段分别做 softmax，再用各自的统计量合并：
 
 $$
 m(x) = \max(m(x^{(1)}), m(x^{(2)})), \quad
@@ -53,7 +53,7 @@ $$
 f(x) = \left[e^{m(x^{(1)}) - m(x)} f(x^{(1)}),\; e^{m(x^{(2)}) - m(x)} f(x^{(2)})\right]
 $$
 
-这里 \(m\) 是段内最大值，\(\ell\) 是归一化和。分块计算时只需维护这两个标量统计量，每来一个新块就用新最大值重新缩放之前累积的 \(f\) 和 \(\ell\)，最后统一除以 \(\ell\)。这就是"在线"的含义：不需要等整行算完，结果与一次性算完整 softmax 完全一致。
+这里 $m$ 是段内最大值，$\ell$ 是归一化和。分块计算时只需维护这两个标量统计量，每来一个新块就用新最大值重新缩放之前累积的 $f$ 和 $\ell$，最后统一除以 $\ell$。这就是"在线"的含义：不需要等整行算完，结果与一次性算完整 softmax 完全一致。
 
 关键点：这个数学过程和标准 attention **完全等价**，结果分毫不差。它不是一个近似方法，而是一个 IO 优化方法。
 
@@ -70,7 +70,7 @@ $$
 
 FlashAttention 没有改变 attention 的数学，只是让它跑得更快更省内存，因此成为后续几乎所有长上下文工作的底层依赖。
 
-再补充一个重要的实现细节：**重计算（recomputation）**。反向传播通常需要注意力矩阵 \(S\) 和 \(P\)，朴素实现得存下整个 \(N \times N\) 的中间结果。FlashAttention 选择不存它们，反向时从 SRAM 里的 \(Q,K,V\) 块重新算出来——这相当于把"存中间结果"换成了"多算一遍"，但因为省掉了大量 HBM 读写，反向反而更快（论文 Fig. 2）。
+再补充一个重要的实现细节：**重计算（recomputation）**。反向传播通常需要注意力矩阵 $S$ 和 $P$，朴素实现得存下整个 $N \times N$ 的中间结果。FlashAttention 选择不存它们，反向时从 SRAM 里的 $Q,K,V$ 块重新算出来——这相当于把"存中间结果"换成了"多算一遍"，但因为省掉了大量 HBM 读写，反向反而更快（论文 Fig. 2）。
 
 ## FlashAttention-2（2023）：把注意力推向 GEMM 效率
 
@@ -124,13 +124,13 @@ FLA（[flash-linear-attention 仓库](https://github.com/fla-org/flash-linear-at
 
 像 FlashAttention 一样，FLA 也把中间结果留在 SRAM 里，避免 HBM 往返——这正是它名字里"Flash"的来源。
 
-用公式看 chunkwise 并行是什么。把序列 \(T\) 切成 \(N_c = \lceil T/L \rceil\) 个长度为 \(L\) 的块，第 \(k\) 块的查询、键、值为 \(Q^{(k)}, K^{(k)}, V^{(k)}\)。线性 RNN 的核心是**块间循环**（inter-chunk recurrence）：
+用公式看 chunkwise 并行是什么。把序列 $T$ 切成 $N_c = \lceil T/L \rceil$ 个长度为 $L$ 的块，第 $k$ 块的查询、键、值为 $Q^{(k)}, K^{(k)}, V^{(k)}$。线性 RNN 的核心是**块间循环**（inter-chunk recurrence）：
 
 $$
 C_k = \bar{g}_k C_{k-1} + \bar{a}_k \odot K^{(k)\top} V^{(k)}
 $$
 
-\(C_k\) 是第 \(k\) 块的隐藏状态，\(\bar{g}_k\)、\(\bar{a}_k\) 是门控项（chunkwise gates）。这一步每个块只依赖上一个块的 \(C_{k-1}\)，可以顺序循环推进，只物化每块的起始状态，中间时刻的状态不用存。
+$C_k$ 是第 $k$ 块的隐藏状态，$\bar{g}_k$、$\bar{a}_k$ 是门控项（chunkwise gates）。这一步每个块只依赖上一个块的 $C_{k-1}$，可以顺序循环推进，只物化每块的起始状态，中间时刻的状态不用存。
 
 块内是**并行贡献**（intra-chunk parallel contribution），对每个块内做类似 attention 的运算：
 
@@ -139,13 +139,13 @@ S^{(k)} = \frac{1}{\sqrt{d_{qk}}} Q^{(k)} K^{(k)\top} \odot D^{(k)}, \quad
 H^{(k)}_{\text{intra}} = S^{(k)} V^{(k)}
 $$
 
-\(D^{(k)}\) 是块内的门控矩阵（对角占优、形状 \(L \times L\)），控制块内位置间的"遗忘"。最终的块输出是块内并行部分与块间循环部分之和：
+$D^{(k)}$ 是块内的门控矩阵（对角占优、形状 $L \times L$），控制块内位置间的"遗忘"。最终的块输出是块内并行部分与块间循环部分之和：
 
 $$
 H^{(k)} = H^{(k)}_{\text{inter}} + H^{(k)}_{\text{intra}}
 $$
 
-关键点：块内计算是二次的（\(L^2\)），但 \(L\) 是常数（典型如 64），所以总复杂度是 \(O(T \cdot L \cdot d)\)，随序列长度线性增长——这就是"线性 RNN"名字的由来。chunkwise 公式把"并行训练"和"循环推理"统一到了一套表示里。
+关键点：块内计算是二次的（$L^2$），但 $L$ 是常数（典型如 64），所以总复杂度是 $O(T \cdot L \cdot d)$，随序列长度线性增长——这就是"线性 RNN"名字的由来。chunkwise 公式把"并行训练"和"循环推理"统一到了一套表示里。
 
 ### Tiled FLA：解决 FLA 的瓶颈
 
