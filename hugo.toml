@@ -54,6 +54,9 @@ enableEmoji = true
     block = [['\[', '\]'], ['$$', '$$']]
     inline = [['\(', '\)'], ['$', '$']]
 
+[markup.goldmark.renderer]
+  unsafe = true
+
 [markup.highlight]
   style = "github"
   lineNos = false
