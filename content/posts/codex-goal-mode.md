@@ -111,7 +111,7 @@ If blocked 连续两轮 p95 无改善时停下，报告瓶颈分析、已尝试�
 两者都把「每轮检查是否完成」做成了机制，但检查者不同：Codex 由主模型按证据面自审；Claude 把每轮结束后的判定外包给独立的轻量裁判模型（默认 Haiku），它读「条件+对话」返回 未达成/达成/不可能，并把理由注入下一轮。对照如下。
 
 | 维度 | Codex goal | Claude /goal |
-|---|---|---|
+| --- | --- | --- |
 | 本质 | 线程级持久化状态 | session 级「停止钩子（Stop hook）」包装，每轮结束后触发检查 |
 | 判定者 | 主模型自审，按证据面审计 | 独立轻量裁判模型（默认 Haiku），读条件+对话 |
 | 裁判能否取证 | 主模型审计时可调用工具取证 | 裁判不调用工具，条件必须写成「Claude 输出能证明」的形式 |
@@ -123,7 +123,7 @@ If blocked 连续两轮 p95 无改善时停下，报告瓶颈分析、已尝试�
 plan 模式对照：
 
 | 维度 | Codex /plan | Claude plan mode |
-|---|---|---|
+| --- | --- | --- |
 | 本质 | 访谈式澄清流程 | 权限模式：只读调研+写计划，编辑被阻止直到批准 |
 | 计划编辑 | 计划可编辑 | Ctrl+G 编辑计划 |
 | 批准选项 | 确认后进入执行 | Yes auto / Yes manual / No keep planning |
@@ -169,15 +169,15 @@ plan 模式对照：
 - [Claude Docs: Permission modes](https://code.claude.com/docs/en/permission-modes)
 - [OpenAI Cookbook: Codex Exec Plans](https://developers.openai.com/cookbook/articles/codex_exec_plans)
 - [Claude Docs: Memory](https://code.claude.com/docs/en/memory)
-- MemGPT（arXiv:2310.08560）— https://arxiv.org/abs/2310.08560
+- [MemGPT（arXiv:2310.08560）](https://arxiv.org/abs/2310.08560)
 - [SWE-bench 排行榜](https://www.swebench.com/)
-- SWE-bench Pro（arXiv:2509.16941）— https://arxiv.org/abs/2509.16941
-- SWE-EVO（arXiv:2512.18470）— https://arxiv.org/abs/2512.18470
+- [SWE-bench Pro（arXiv:2509.16941）](https://arxiv.org/abs/2509.16941)
+- [SWE-EVO（arXiv:2512.18470）](https://arxiv.org/abs/2512.18470)
 - [τ-bench](https://taubench.com/)
 - [CodeClash](https://codeclash.ai/)
 - [LongCLI-Bench](https://aclanthology.org/2026.findings-acl.1497/)
-- LongHorizon-Harness（arXiv:2608.01964）— https://arxiv.org/abs/2608.01964
-- PushBench（arXiv:2605.23574）— https://arxiv.org/abs/2605.23574
-- StructAgent（arXiv:2607.11388）— https://arxiv.org/abs/2607.11388
+- [LongHorizon-Harness（arXiv:2608.01964）](https://arxiv.org/abs/2608.01964)
+- [PushBench（arXiv:2605.23574）](https://arxiv.org/abs/2605.23574)
+- [StructAgent（arXiv:2607.11388）](https://arxiv.org/abs/2607.11388)
 - [Reza Rezvani: Claude Code Goal in Production](https://alirezarezvani.medium.com/claude-code-goal-in-production-3-tested-use-cases-that-work-5ab5f449a3c7)
 - [Codex manual](https://developers.openai.com/codex/codex-manual.md)
