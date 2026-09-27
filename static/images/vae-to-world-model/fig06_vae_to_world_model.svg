@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="555" viewBox="0 0 1200 555">
+<style>
+  .title { font: 700 28px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
+  .label { font: 600 20px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
+  .small { font: 400 17px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#34495E; }
+  .math { font: 500 19px "STIX Two Math","Cambria Math","Times New Roman",serif; fill:#17202A; }
+  .box { fill:#F7F9FB; stroke:#526D82; stroke-width:2.2; rx:14; }
+  .box2 { fill:#EEF4F8; stroke:#526D82; stroke-width:2.2; rx:14; }
+  .accent { fill:#F3F7FA; stroke:#2F5D7C; stroke-width:2.5; rx:14; }
+  .arrow { stroke:#526D82; stroke-width:2.5; fill:none; marker-end:url(#arrow); }
+  .dash { stroke:#7D8D9C; stroke-width:2.2; fill:none; stroke-dasharray:8 7; marker-end:url(#arrow2); }
+</style>
+<defs>
+ <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+   <path d="M0,0 L0,6 L9,3 z" fill="#526D82"/>
+ </marker>
+ <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+   <path d="M0,0 L0,6 L9,3 z" fill="#7D8D9C"/>
+ </marker>
+</defs>
+<rect width="100%" height="100%" fill="white"/>
+
+<text x="60" y="48" class="title">图 6｜VAE 与 Sequential World Model 的结构对应</text>
+
+<text x="160" y="105" class="label">静态 VAE</text>
+<rect x="90" y="145" width="210" height="85" class="box2"/>
+<text x="195" y="180" text-anchor="middle" class="math">p(z)</text>
+<text x="195" y="208" text-anchor="middle" class="small">static prior</text>
+<rect x="400" y="145" width="240" height="85" class="box2"/>
+<text x="520" y="180" text-anchor="middle" class="math">q_φ(z|x)</text>
+<text x="520" y="208" text-anchor="middle" class="small">inference</text>
+<rect x="740" y="145" width="240" height="85" class="box2"/>
+<text x="860" y="180" text-anchor="middle" class="math">p_θ(x|z)</text>
+<text x="860" y="208" text-anchor="middle" class="small">observation likelihood</text>
+
+<text x="110" y="330" class="label">Sequential latent world model</text>
+<rect x="90" y="370" width="280" height="100" class="accent"/>
+<text x="230" y="406" text-anchor="middle" class="math">p_θ(z_t|z_{t-1},a_{t-1})</text>
+<text x="230" y="440" text-anchor="middle" class="small">dynamic prior</text>
+<rect x="430" y="370" width="330" height="100" class="accent"/>
+<text x="595" y="406" text-anchor="middle" class="math">q_φ(z_t|z_{t-1},a_{t-1},o_t)</text>
+<text x="595" y="440" text-anchor="middle" class="small">filtering / correction</text>
+<rect x="820" y="370" width="260" height="100" class="accent"/>
+<text x="950" y="406" text-anchor="middle" class="math">p_θ(o_t|z_t)</text>
+<text x="950" y="440" text-anchor="middle" class="small">observation model</text>
+
+<path d="M195 230 L230 370" class="dash"/>
+<path d="M520 230 L595 370" class="dash"/>
+<path d="M860 230 L950 370" class="dash"/>
+
+<text x="60" y="520" class="small">关键变化：固定先验 p(z) 被替换成 action-conditioned dynamic prior；variational inference 的思想保持不变。</text>
+
+</svg>

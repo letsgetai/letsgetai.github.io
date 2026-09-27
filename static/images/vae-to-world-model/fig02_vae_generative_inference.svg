@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="530" viewBox="0 0 1200 530">
+<style>
+  .title { font: 700 28px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
+  .label { font: 600 20px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
+  .small { font: 400 17px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#34495E; }
+  .math { font: 500 19px "STIX Two Math","Cambria Math","Times New Roman",serif; fill:#17202A; }
+  .box { fill:#F7F9FB; stroke:#526D82; stroke-width:2.2; rx:14; }
+  .box2 { fill:#EEF4F8; stroke:#526D82; stroke-width:2.2; rx:14; }
+  .accent { fill:#F3F7FA; stroke:#2F5D7C; stroke-width:2.5; rx:14; }
+  .arrow { stroke:#526D82; stroke-width:2.5; fill:none; marker-end:url(#arrow); }
+  .dash { stroke:#7D8D9C; stroke-width:2.2; fill:none; stroke-dasharray:8 7; marker-end:url(#arrow2); }
+</style>
+<defs>
+ <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+   <path d="M0,0 L0,6 L9,3 z" fill="#526D82"/>
+ </marker>
+ <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+   <path d="M0,0 L0,6 L9,3 z" fill="#7D8D9C"/>
+ </marker>
+</defs>
+<rect width="100%" height="100%" fill="white"/>
+
+<text x="60" y="52" class="title">图 2｜VAE 的生成方向与推断方向</text>
+
+<rect x="110" y="160" width="230" height="110" class="box2"/>
+<text x="225" y="198" text-anchor="middle" class="label">Prior</text>
+<text x="225" y="235" text-anchor="middle" class="math">z ~ p(z)</text>
+
+<rect x="480" y="145" width="250" height="140" class="accent"/>
+<text x="605" y="187" text-anchor="middle" class="label">Decoder</text>
+<text x="605" y="225" text-anchor="middle" class="math">p_θ(x | z)</text>
+<text x="605" y="255" text-anchor="middle" class="small">latent → data likelihood</text>
+
+<rect x="900" y="160" width="210" height="110" class="box"/>
+<text x="1005" y="198" text-anchor="middle" class="label">观测 x</text>
+<text x="1005" y="235" text-anchor="middle" class="small">训练样本</text>
+
+<path d="M340 215 L480 215" class="arrow"/>
+<path d="M730 215 L900 215" class="arrow"/>
+
+<rect x="470" y="365" width="270" height="110" class="box2"/>
+<text x="605" y="405" text-anchor="middle" class="label">Encoder / Approx. posterior</text>
+<text x="605" y="443" text-anchor="middle" class="math">q_φ(z | x)</text>
+<path d="M900 235 C820 300,760 365,740 405" class="dash"/>
+<path d="M470 405 C380 385,300 330,255 270" class="dash"/>
+
+<text x="80" y="345" class="small">生成：先采 z，再由 decoder 生成 x</text>
+<text x="790" y="345" class="small">推断：给定 x，估计哪些 z 能解释它</text>
+
+</svg>

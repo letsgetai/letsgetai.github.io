@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="560" viewBox="0 0 1200 560">
+<style>
+  .title { font: 700 28px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
+  .label { font: 600 20px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
+  .small { font: 400 17px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#34495E; }
+  .math { font: 500 19px "STIX Two Math","Cambria Math","Times New Roman",serif; fill:#17202A; }
+  .box { fill:#F7F9FB; stroke:#526D82; stroke-width:2.2; rx:14; }
+  .box2 { fill:#EEF4F8; stroke:#526D82; stroke-width:2.2; rx:14; }
+  .accent { fill:#F3F7FA; stroke:#2F5D7C; stroke-width:2.5; rx:14; }
+  .arrow { stroke:#526D82; stroke-width:2.5; fill:none; marker-end:url(#arrow); }
+  .dash { stroke:#7D8D9C; stroke-width:2.2; fill:none; stroke-dasharray:8 7; marker-end:url(#arrow2); }
+</style>
+<defs>
+ <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+   <path d="M0,0 L0,6 L9,3 z" fill="#526D82"/>
+ </marker>
+ <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+   <path d="M0,0 L0,6 L9,3 z" fill="#7D8D9C"/>
+ </marker>
+</defs>
+<rect width="100%" height="100%" fill="white"/>
+
+<text x="60" y="48" class="title">图 4｜Sequential latent world model：预测、观测与修正</text>
+
+<rect x="90" y="170" width="150" height="90" class="box2"/>
+<text x="165" y="208" text-anchor="middle" class="label">z_{t-1}</text>
+<text x="165" y="238" text-anchor="middle" class="small">previous state</text>
+
+<rect x="390" y="150" width="220" height="130" class="accent"/>
+<text x="500" y="190" text-anchor="middle" class="label">Dynamics prior</text>
+<text x="500" y="227" text-anchor="middle" class="math">p_θ(z_t|z_{t-1},a_{t-1})</text>
+<text x="500" y="257" text-anchor="middle" class="small">不看当前 o_t</text>
+
+<rect x="740" y="160" width="150" height="100" class="box2"/>
+<text x="815" y="202" text-anchor="middle" class="label">z_t</text>
+<text x="815" y="232" text-anchor="middle" class="small">current latent</text>
+
+<rect x="990" y="160" width="150" height="100" class="box"/>
+<text x="1065" y="202" text-anchor="middle" class="label">o_t</text>
+<text x="1065" y="232" text-anchor="middle" class="small">observation</text>
+
+<path d="M240 215 L390 215" class="arrow"/>
+<path d="M610 215 L740 215" class="arrow"/>
+<path d="M890 210 L990 210" class="arrow"/>
+
+<rect x="335" y="30" width="190" height="70" class="box"/>
+<text x="430" y="73" text-anchor="middle" class="label">a_{t-1}</text>
+<path d="M430 100 L465 150" class="arrow"/>
+
+<rect x="610" y="360" width="340" height="120" class="accent"/>
+<text x="780" y="400" text-anchor="middle" class="label">Filtered posterior / correction</text>
+<text x="780" y="438" text-anchor="middle" class="math">q_φ(z_t|z_{t-1},a_{t-1},o_t)</text>
+
+<path d="M165 260 C220 350,440 420,610 420" class="dash"/>
+<path d="M430 100 C520 250,620 340,650 375" class="dash"/>
+<path d="M1065 260 C1040 345,960 405,950 420" class="dash"/>
+<path d="M780 360 C790 315,805 285,815 260" class="dash"/>
+
+<text x="70" y="520" class="small">直觉：prior = “没看当前世界时的预测”；posterior = “看过 o_t 后的修正版”。训练时让二者尽量一致。</text>
+
+</svg>
