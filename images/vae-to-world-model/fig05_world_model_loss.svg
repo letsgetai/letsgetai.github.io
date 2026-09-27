@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="550" viewBox="0 0 1200 550">
+<style>
+  .title { font: 700 28px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
+  .label { font: 600 20px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
+  .small { font: 400 17px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#34495E; }
+  .math { font: 500 19px "STIX Two Math","Cambria Math","Times New Roman",serif; fill:#17202A; }
+  .box { fill:#F7F9FB; stroke:#526D82; stroke-width:2.2; rx:14; }
+  .box2 { fill:#EEF4F8; stroke:#526D82; stroke-width:2.2; rx:14; }
+  .accent { fill:#F3F7FA; stroke:#2F5D7C; stroke-width:2.5; rx:14; }
+  .arrow { stroke:#526D82; stroke-width:2.5; fill:none; marker-end:url(#arrow); }
+  .dash { stroke:#7D8D9C; stroke-width:2.2; fill:none; stroke-dasharray:8 7; marker-end:url(#arrow2); }
+</style>
+<defs>
+ <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+   <path d="M0,0 L0,6 L9,3 z" fill="#526D82"/>
+ </marker>
+ <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+   <path d="M0,0 L0,6 L9,3 z" fill="#7D8D9C"/>
+ </marker>
+</defs>
+<rect width="100%" height="100%" fill="white"/>
+
+<text x="60" y="48" class="title">图 5｜世界模型训练：没有 latent 标签，靠两类约束把 z_t “夹”出来</text>
+
+<rect x="70" y="145" width="210" height="100" class="box"/>
+<text x="175" y="185" text-anchor="middle" class="label">z_{t-1}, a_{t-1}</text>
+<text x="175" y="218" text-anchor="middle" class="small">过去状态与动作</text>
+
+<rect x="360" y="115" width="250" height="115" class="accent"/>
+<text x="485" y="154" text-anchor="middle" class="label">Dynamics</text>
+<text x="485" y="190" text-anchor="middle" class="math">p_t = p_θ(z_t|...)</text>
+
+<rect x="360" y="305" width="250" height="120" class="accent"/>
+<text x="485" y="345" text-anchor="middle" class="label">Encoder / Correction</text>
+<text x="485" y="382" text-anchor="middle" class="math">q_t = q_φ(z_t|...,o_t)</text>
+
+<rect x="700" y="305" width="180" height="100" class="box2"/>
+<text x="790" y="345" text-anchor="middle" class="label">sample z_t</text>
+<text x="790" y="377" text-anchor="middle" class="small">z_t ~ q_t</text>
+
+<rect x="960" y="305" width="180" height="100" class="box"/>
+<text x="1050" y="345" text-anchor="middle" class="label">Decoder</text>
+<text x="1050" y="377" text-anchor="middle" class="math">p_θ(o_t|z_t)</text>
+
+<rect x="70" y="330" width="170" height="80" class="box"/>
+<text x="155" y="378" text-anchor="middle" class="label">真实 o_t</text>
+
+<path d="M280 190 L360 172" class="arrow"/>
+<path d="M280 210 C320 250,330 320,360 350" class="arrow"/>
+<path d="M240 370 L360 370" class="arrow"/>
+<path d="M610 365 L700 355" class="arrow"/>
+<path d="M880 355 L960 355" class="arrow"/>
+
+<rect x="690" y="100" width="210" height="95" class="box2"/>
+<text x="795" y="137" text-anchor="middle" class="label">Dynamics KL</text>
+<text x="795" y="170" text-anchor="middle" class="math">KL(q_t || p_t)</text>
+<path d="M610 165 L690 147" class="dash"/>
+<path d="M610 340 C650 290,700 220,745 195" class="dash"/>
+
+<rect x="940" y="120" width="220" height="95" class="box2"/>
+<text x="1050" y="157" text-anchor="middle" class="label">Reconstruction</text>
+<text x="1050" y="190" text-anchor="middle" class="math">−log p_θ(o_t|z_t)</text>
+<path d="M1050 305 L1050 215" class="dash"/>
+<path d="M240 370 C500 500,920 500,1020 215" class="dash"/>
+
+<text x="70" y="505" class="small">两类约束：① z_t 必须解释真实 observation；② z_t 必须能从过去和动作预测出来。</text>
+
+</svg>

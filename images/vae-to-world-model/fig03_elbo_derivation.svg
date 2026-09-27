@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="540" viewBox="0 0 1200 540">
+<style>
+  .title { font: 700 28px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
+  .label { font: 600 20px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
+  .small { font: 400 17px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#34495E; }
+  .math { font: 500 19px "STIX Two Math","Cambria Math","Times New Roman",serif; fill:#17202A; }
+  .box { fill:#F7F9FB; stroke:#526D82; stroke-width:2.2; rx:14; }
+  .box2 { fill:#EEF4F8; stroke:#526D82; stroke-width:2.2; rx:14; }
+  .accent { fill:#F3F7FA; stroke:#2F5D7C; stroke-width:2.5; rx:14; }
+  .arrow { stroke:#526D82; stroke-width:2.5; fill:none; marker-end:url(#arrow); }
+  .dash { stroke:#7D8D9C; stroke-width:2.2; fill:none; stroke-dasharray:8 7; marker-end:url(#arrow2); }
+</style>
+<defs>
+ <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+   <path d="M0,0 L0,6 L9,3 z" fill="#526D82"/>
+ </marker>
+ <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
+   <path d="M0,0 L0,6 L9,3 z" fill="#7D8D9C"/>
+ </marker>
+</defs>
+<rect width="100%" height="100%" fill="white"/>
+
+<text x="60" y="48" class="title">图 3｜ELBO 为什么出现：把难算的 marginal likelihood 变成可优化下界</text>
+
+<rect x="60" y="110" width="270" height="90" class="box"/>
+<text x="195" y="145" text-anchor="middle" class="label">Maximum likelihood</text>
+<text x="195" y="178" text-anchor="middle" class="math">log p_θ(x)</text>
+
+<rect x="400" y="100" width="330" height="110" class="box2"/>
+<text x="565" y="137" text-anchor="middle" class="label">Marginalize latent z</text>
+<text x="565" y="176" text-anchor="middle" class="math">p_θ(x)=∫p_θ(x,z)dz</text>
+
+<rect x="800" y="90" width="340" height="130" class="accent"/>
+<text x="970" y="127" text-anchor="middle" class="label">引入 q_φ(z|x)</text>
+<text x="970" y="162" text-anchor="middle" class="math">p_θ(x)=E_q[p_θ(x,z)/q_φ(z|x)]</text>
+<text x="970" y="193" text-anchor="middle" class="small">只是改写，仍然是等号</text>
+
+<path d="M330 155 L400 155" class="arrow"/>
+<path d="M730 155 L800 155" class="arrow"/>
+
+<rect x="185" y="310" width="350" height="120" class="accent"/>
+<text x="360" y="350" text-anchor="middle" class="label">Jensen 不等式</text>
+<text x="360" y="386" text-anchor="middle" class="math">log E[Y] ≥ E[log Y]</text>
+
+<rect x="650" y="300" width="430" height="140" class="box2"/>
+<text x="865" y="338" text-anchor="middle" class="label">得到 ELBO</text>
+<text x="865" y="374" text-anchor="middle" class="math">E_q[log p_θ(x|z)]</text>
+<text x="865" y="405" text-anchor="middle" class="math">− KL(q_φ(z|x) || p(z))</text>
+
+<path d="M970 220 C940 260,540 270,500 315" class="arrow"/>
+<path d="M535 370 L650 370" class="arrow"/>
+
+<text x="60" y="500" class="small">关键：q 不只是“一个编码器”，它提供了一个针对当前 x 的采样分布，使难处理的 latent 积分进入 variational inference 框架。</text>
+
+</svg>

@@ -1,4 +1,45 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Posts on The Herta</title><link>https://letsgetai.github.io/posts/</link><description>Recent content in Posts on The Herta</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Fri, 25 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://letsgetai.github.io/posts/index.xml" rel="self" type="application/rss+xml"/><item><title>哪些归纳偏置活到了 scaling 时代：从时间序列预测十年复盘说起</title><link>https://letsgetai.github.io/posts/inductive-bias-time-series-scaling/</link><pubDate>Fri, 25 Sep 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/inductive-bias-time-series-scaling/</guid><description>&lt;blockquote&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Posts on The Herta</title><link>https://letsgetai.github.io/posts/</link><description>Recent content in Posts on The Herta</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sun, 27 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://letsgetai.github.io/posts/index.xml" rel="self" type="application/rss+xml"/><item><title>从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）</title><link>https://letsgetai.github.io/posts/vae-to-world-model/</link><pubDate>Sun, 27 Sep 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/vae-to-world-model/</guid><description>&lt;blockquote&gt;
+&lt;p&gt;目标：用一条连续的逻辑链，把“世界模型是什么、为什么需要 latent state、为什么会出现 posterior、ELBO 从哪里来、世界模型的 loss 为什么长成 reconstruction + dynamics KL”讲清楚。&lt;br&gt;
+这不是论文综述，而是一份偏“推导 + 直觉”的入门笔记。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id="1-世界模型到底是什么"&gt;1. 世界模型到底是什么&lt;/h2&gt;
+&lt;p&gt;最核心的直觉是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;strong&gt;世界模型学习一个内部世界状态，并预测这个世界在动作作用下如何变化。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;最简形式：&lt;/p&gt;
+$$
+(z_t, a_t) \rightarrow z_{t+1}
+$$&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$o_t$：当前观测（图像、深度、传感器等）&lt;/li&gt;
+&lt;li&gt;$s_t$：真实世界状态，通常不可直接观测&lt;/li&gt;
+&lt;li&gt;$z_t$：模型内部学习到的 latent state&lt;/li&gt;
+&lt;li&gt;$a_t$：动作&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;可以把世界模型拆成三个模块：&lt;/p&gt;
+$$
+\boxed{
+\text{Representation}
++
+\text{Dynamics}
++
+\text{Decision Interface}
+}
+$$&lt;p&gt;对应：&lt;/p&gt;
+$$
+o_t \rightarrow z_t
+$$$$
+(z_t,a_t)\rightarrow z_{t+1}
+$$$$
+z_t \rightarrow a_t
+$$&lt;p&gt;其中第三项不一定直接内置在 world model 本体里，也可能由 policy / planner 负责。&lt;/p&gt;
+&lt;p&gt;&lt;img alt="世界模型的最小结构" loading="lazy" src="https://letsgetai.github.io/images/vae-to-world-model/fig01_world_model_architecture.svg"&gt;&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;图 1：世界模型最小结构。表示模块把观测压缩为内部状态，动力学模块预测动作作用后的状态变化，决策接口利用内部状态产生动作。&lt;/em&gt;&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id="2-为什么会自然进入-pomdp"&gt;2. 为什么会自然进入 POMDP&lt;/h2&gt;
+&lt;p&gt;现实里，agent 通常看不到真正的状态 $s_t$，只能看到观测 $o_t$。&lt;/p&gt;</description></item><item><title>哪些归纳偏置活到了 scaling 时代：从时间序列预测十年复盘说起</title><link>https://letsgetai.github.io/posts/inductive-bias-time-series-scaling/</link><pubDate>Fri, 25 Sep 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/inductive-bias-time-series-scaling/</guid><description>&lt;blockquote&gt;
 &lt;p&gt;结论先行：过去十年时间序列预测模型的设计史，可以重写成一部“押注竞赛”——每个方法都在押不同的数据结构假设：什么该成为一个 token、attention 该花在哪个轴上、要不要显式分解趋势、未来该一步步生成还是整窗输出。scaling 是选择环境：跨域预训练之后，trend 分解、频域基、严格 channel independence 这些强领域偏置大多被淘汰，patch、归一化、参数共享这些弱而通用的偏置活了下来。归纳偏置这个视角的全部用处，是逼你回答五个问题：假设了什么、针对哪个瓶颈、何时失效、能否让数据去学、放大后还值不值得保留。&lt;/p&gt;
 &lt;/blockquote&gt;
 &lt;h2 id="引子有限数据--归纳偏置--泛化"&gt;引子：有限数据 + 归纳偏置 → 泛化&lt;/h2&gt;

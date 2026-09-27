@@ -1,0 +1,672 @@
+<!doctype html><html lang=en dir=auto data-theme=auto><head><meta charset=utf-8><meta http-equiv=X-UA-Compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,shrink-to-fit=no"><meta name=robots content="index, follow"><title>从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版） | The Herta</title><meta name=keywords content><meta name=description content="
+目标：用一条连续的逻辑链，把“世界模型是什么、为什么需要 latent state、为什么会出现 posterior、ELBO 从哪里来、世界模型的 loss 为什么长成 reconstruction + dynamics KL”讲清楚。
+这不是论文综述，而是一份偏“推导 + 直觉”的入门笔记。
+
+
+1. 世界模型到底是什么
+最核心的直觉是：
+
+世界模型学习一个内部世界状态，并预测这个世界在动作作用下如何变化。
+
+最简形式：
+$$
+(z_t, a_t) \rightarrow z_{t+1}
+$$其中：
+
+$o_t$：当前观测（图像、深度、传感器等）
+$s_t$：真实世界状态，通常不可直接观测
+$z_t$：模型内部学习到的 latent state
+$a_t$：动作
+
+可以把世界模型拆成三个模块：
+$$
+\boxed{
+\text{Representation}
++
+\text{Dynamics}
++
+\text{Decision Interface}
+}
+$$对应：
+$$
+o_t \rightarrow z_t
+$$$$
+(z_t,a_t)\rightarrow z_{t+1}
+$$$$
+z_t \rightarrow a_t
+$$其中第三项不一定直接内置在 world model 本体里，也可能由 policy / planner 负责。
+
+图 1：世界模型最小结构。表示模块把观测压缩为内部状态，动力学模块预测动作作用后的状态变化，决策接口利用内部状态产生动作。
+
+2. 为什么会自然进入 POMDP
+现实里，agent 通常看不到真正的状态 $s_t$，只能看到观测 $o_t$。"><meta name=author content="LetsGetAI"><link rel=canonical href=https://letsgetai.github.io/posts/vae-to-world-model/><link crossorigin=anonymous href=/assets/css/stylesheet.4a7a0536a1692fc4d59bd621cb1b40f180c2fea7796bab2d32e27cfc03deb1b9.css integrity="sha256-SnoFNqFpL8TVm9YhyxtA8YDC/qd5a6stMuJ8/APesbk=" rel="preload stylesheet" as=style><link rel=icon href=https://letsgetai.github.io/favicon.ico><link rel=icon type=image/png sizes=16x16 href=https://letsgetai.github.io/favicon-16x16.png><link rel=icon type=image/png sizes=32x32 href=https://letsgetai.github.io/favicon-32x32.png><link rel=apple-touch-icon href=https://letsgetai.github.io/apple-touch-icon.png><link rel=mask-icon href=https://letsgetai.github.io/safari-pinned-tab.svg><meta name=theme-color content="#2e2e33"><meta name=msapplication-TileColor content="#2e2e33"><link rel=alternate hreflang=en href=https://letsgetai.github.io/posts/vae-to-world-model/><noscript><style>#theme-toggle,.top-link{display:none}</style><style>@media(prefers-color-scheme:dark){:root{--theme:rgb(29, 30, 32);--entry:rgb(46, 46, 51);--primary:rgb(218, 218, 219);--secondary:rgb(155, 156, 157);--tertiary:rgb(65, 66, 68);--content:rgb(196, 196, 197);--code-block-bg:rgb(46, 46, 51);--code-bg:rgb(55, 56, 62);--border:rgb(51, 51, 51);color-scheme:dark}.list{background:var(--theme)}.toc{background:var(--entry)}}</style></noscript><script>localStorage.getItem("pref-theme")==="dark"?document.querySelector("html").dataset.theme="dark":localStorage.getItem("pref-theme")==="light"?document.querySelector("html").dataset.theme="light":window.matchMedia("(prefers-color-scheme: dark)").matches?document.querySelector("html").dataset.theme="dark":document.querySelector("html").dataset.theme="light"</script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css><script defer src=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js></script><script defer src=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js onload='renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:!0},{left:"$",right:"$",display:!1}]})'></script><script src=https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js></script><script>mermaid.initialize({startOnLoad:!0,theme:"default",flowchart:{useMaxWidth:!0}})</script><meta property="og:url" content="https://letsgetai.github.io/posts/vae-to-world-model/"><meta property="og:site_name" content="The Herta"><meta property="og:title" content="从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）"><meta property="og:description" content="目标：用一条连续的逻辑链，把“世界模型是什么、为什么需要 latent state、为什么会出现 posterior、ELBO 从哪里来、世界模型的 loss 为什么长成 reconstruction + dynamics KL”讲清楚。
+这不是论文综述，而是一份偏“推导 + 直觉”的入门笔记。
+1. 世界模型到底是什么 最核心的直觉是：
+世界模型学习一个内部世界状态，并预测这个世界在动作作用下如何变化。
+最简形式：
+$$ (z_t, a_t) \rightarrow z_{t+1} $$其中：
+$o_t$：当前观测（图像、深度、传感器等） $s_t$：真实世界状态，通常不可直接观测 $z_t$：模型内部学习到的 latent state $a_t$：动作 可以把世界模型拆成三个模块：
+$$ \boxed{ \text{Representation} + \text{Dynamics} + \text{Decision Interface} } $$对应：
+$$ o_t \rightarrow z_t $$$$ (z_t,a_t)\rightarrow z_{t+1} $$$$ z_t \rightarrow a_t $$其中第三项不一定直接内置在 world model 本体里，也可能由 policy / planner 负责。
+图 1：世界模型最小结构。表示模块把观测压缩为内部状态，动力学模块预测动作作用后的状态变化，决策接口利用内部状态产生动作。
+2. 为什么会自然进入 POMDP 现实里，agent 通常看不到真正的状态 $s_t$，只能看到观测 $o_t$。"><meta property="og:locale" content="zh_cn"><meta property="og:type" content="article"><meta property="article:section" content="posts"><meta property="article:published_time" content="2026-09-27T00:00:00+00:00"><meta property="article:modified_time" content="2026-09-27T00:00:00+00:00"><meta name=twitter:card content="summary"><meta name=twitter:title content="从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）"><meta name=twitter:description content="目标：用一条连续的逻辑链，把“世界模型是什么、为什么需要 latent state、为什么会出现 posterior、ELBO 从哪里来、世界模型的 loss 为什么长成 reconstruction + dynamics KL”讲清楚。
+这不是论文综述，而是一份偏“推导 + 直觉”的入门笔记。
+1. 世界模型到底是什么 最核心的直觉是：
+世界模型学习一个内部世界状态，并预测这个世界在动作作用下如何变化。
+最简形式：
+$$ (z_t, a_t) \rightarrow z_{t+1} $$其中：
+$o_t$：当前观测（图像、深度、传感器等） $s_t$：真实世界状态，通常不可直接观测 $z_t$：模型内部学习到的 latent state $a_t$：动作 可以把世界模型拆成三个模块：
+$$ \boxed{ \text{Representation} + \text{Dynamics} + \text{Decision Interface} } $$对应：
+$$ o_t \rightarrow z_t $$$$ (z_t,a_t)\rightarrow z_{t+1} $$$$ z_t \rightarrow a_t $$其中第三项不一定直接内置在 world model 本体里，也可能由 policy / planner 负责。
+图 1：世界模型最小结构。表示模块把观测压缩为内部状态，动力学模块预测动作作用后的状态变化，决策接口利用内部状态产生动作。
+2. 为什么会自然进入 POMDP 现实里，agent 通常看不到真正的状态 $s_t$，只能看到观测 $o_t$。"><script type=application/ld+json>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Posts","item":"https://letsgetai.github.io/posts/"},{"@type":"ListItem","position":2,"name":"从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）","item":"https://letsgetai.github.io/posts/vae-to-world-model/"}]}</script><script type=application/ld+json>{"@context":"https://schema.org","@type":"BlogPosting","headline":"从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）","name":"从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）","description":" 目标：用一条连续的逻辑链，把“世界模型是什么、为什么需要 latent state、为什么会出现 posterior、ELBO 从哪里来、世界模型的 loss 为什么长成 reconstruction + dynamics KL”讲清楚。\n这不是论文综述，而是一份偏“推导 + 直觉”的入门笔记。\n1. 世界模型到底是什么 最核心的直觉是：\n世界模型学习一个内部世界状态，并预测这个世界在动作作用下如何变化。\n最简形式：\n$$ (z_t, a_t) \\rightarrow z_{t+1} $$其中：\n$o_t$：当前观测（图像、深度、传感器等） $s_t$：真实世界状态，通常不可直接观测 $z_t$：模型内部学习到的 latent state $a_t$：动作 可以把世界模型拆成三个模块：\n$$ \\boxed{ \\text{Representation} + \\text{Dynamics} + \\text{Decision Interface} } $$对应：\n$$ o_t \\rightarrow z_t $$$$ (z_t,a_t)\\rightarrow z_{t+1} $$$$ z_t \\rightarrow a_t $$其中第三项不一定直接内置在 world model 本体里，也可能由 policy / planner 负责。\n图 1：世界模型最小结构。表示模块把观测压缩为内部状态，动力学模块预测动作作用后的状态变化，决策接口利用内部状态产生动作。\n2. 为什么会自然进入 POMDP 现实里，agent 通常看不到真正的状态 $s_t$，只能看到观测 $o_t$。\n","keywords":[],"articleBody":" 目标：用一条连续的逻辑链，把“世界模型是什么、为什么需要 latent state、为什么会出现 posterior、ELBO 从哪里来、世界模型的 loss 为什么长成 reconstruction + dynamics KL”讲清楚。\n这不是论文综述，而是一份偏“推导 + 直觉”的入门笔记。\n1. 世界模型到底是什么 最核心的直觉是：\n世界模型学习一个内部世界状态，并预测这个世界在动作作用下如何变化。\n最简形式：\n$$ (z_t, a_t) \\rightarrow z_{t+1} $$其中：\n$o_t$：当前观测（图像、深度、传感器等） $s_t$：真实世界状态，通常不可直接观测 $z_t$：模型内部学习到的 latent state $a_t$：动作 可以把世界模型拆成三个模块：\n$$ \\boxed{ \\text{Representation} + \\text{Dynamics} + \\text{Decision Interface} } $$对应：\n$$ o_t \\rightarrow z_t $$$$ (z_t,a_t)\\rightarrow z_{t+1} $$$$ z_t \\rightarrow a_t $$其中第三项不一定直接内置在 world model 本体里，也可能由 policy / planner 负责。\n图 1：世界模型最小结构。表示模块把观测压缩为内部状态，动力学模块预测动作作用后的状态变化，决策接口利用内部状态产生动作。\n2. 为什么会自然进入 POMDP 现实里，agent 通常看不到真正的状态 $s_t$，只能看到观测 $o_t$。\n因此我们可以写：\n$$ s_t \\rightarrow o_t $$而状态在动作作用下变化：\n$$ p(s_t|s_{t-1},a_{t-1}) $$于是，一个最基本的生成过程是：\n$$ s_{t-1},a_{t-1}\\rightarrow s_t \\rightarrow o_t $$整个联合分布可以写成：\n$$ p(s_{0:T},o_{1:T}|a_{0:T-1}) = p(s_0) \\prod_{t=1}^{T} p(s_t|s_{t-1},a_{t-1}) p(o_t|s_t) $$这个式子来自两件事：\n联合概率的 chain rule POMDP / Markov 假设带来的条件独立性 3. 为什么要引入 latent state 真实 $s_t$ 通常不可见。\n比如机器人真正的世界状态可能包含：\n所有物体的 3D 位置 速度 遮挡物体 接触状态 摩擦系数 材质 其他 agent 的内部状态 但 agent 只能看到 RGB、Depth、Proprioception 等观测。\n因此我们引入一个学习得到的内部状态：\n$$ z_t $$希望它成为：\n$$ z_t \\approx \\text{history 的有效压缩} $$也就是：\n$$ z_t \\approx f(o_{\\le t},a_{\\lt t}) $$并且它应该满足两个要求：\n$$ \\boxed{ \\text{能解释当前世界} } $$以及：\n$$ \\boxed{ \\text{能从过去预测出来} } $$后面 world model 的 loss，本质上就是在同时约束这两件事。\n4. 先从静态 VAE 开始 世界模型的 variational learning 很像 VAE，所以先把 VAE 的逻辑推清楚。\n4.1 VAE 的生成假设 假设一张图片 $x$ 是由 latent variable $z$ 生成的：\n$$ z \\sim p(z) $$$$ x \\sim p_\\theta(x|z) $$其中：\n$p(z)$：latent prior，通常取 $N(0,I)$ $p_\\theta(x|z)$：decoder / likelihood $\\theta$：decoder 的参数 所以联合分布：\n$$ p_\\theta(x,z) = p(z)p_\\theta(x|z) $$\n图 2：VAE 同时包含生成方向（$z\\rightarrow x$）和推断方向（$x\\rightarrow q_\\phi(z|x)$）。\n5. VAE 真正想优化什么 我们的目标不是“重建图片”本身，而是 maximum likelihood：\n$$ \\boxed{ \\max_\\theta \\log p_\\theta(x) } $$也就是说：\n希望训练数据 $x$ 在模型下出现的概率尽可能大。\n由于 $z$ 没有被观测到：\n$$ p_\\theta(x) = \\int p_\\theta(x,z)\\,dz $$展开：\n$$ p_\\theta(x) = \\int p(z)p_\\theta(x|z)\\,dz $$这个积分的含义是：\n把所有可能生成当前 $x$ 的 latent $z$ 的贡献全部加起来。\n6. 为什么这个积分难算 难点不是 $p_\\theta(x|z)$ 本身不能算。\n给定一个具体 $x,z$，通常可以直接计算：\n$$ p_\\theta(x|z) $$真正难的是：\n$$ p_\\theta(x) = \\int p(z)p_\\theta(x|z)\\,dz $$原因主要有两个。\n6.1 $z$ 是高维连续变量 例如：\n$$ z\\in \\mathbb R^{128} $$这就是一个 128 维积分。\n6.2 Decoder 关于 $z$ 是复杂非线性函数 例如：\n$$ p_\\theta(x|z) = N(x;f_\\theta(z),\\sigma^2I) $$其中：\n$$ f_\\theta(z) $$是一个深度神经网络。\n于是：\n$$ p_\\theta(x) = \\int N(z;0,I) N(x;f_\\theta(z),\\sigma^2I) dz $$一般没有解析解。\n7. Monte Carlo 能不能近似这个积分 可以。\n因为：\n$$ p_\\theta(x) = E_{z\\sim p(z)} [p_\\theta(x|z)] $$因此可以从 prior 中采样：\n$$ z^{(1)},\\dots,z^{(K)} \\sim p(z) $$然后：\n$$ p_\\theta(x) \\approx \\frac{1}{K} \\sum_{k=1}^{K} p_\\theta(x|z^{(k)}) $$这就是 Monte Carlo estimation。\n问题是：\n对当前特定的 $x$，从整个 prior $p(z)$ 乱采，大部分 $z$ 都不能很好解释它。\n所以估计效率低、方差大。\n8. 我们真正希望知道的是 posterior 给定当前 $x$，我们更希望知道：\n$$ p_\\theta(z|x) $$它回答：\n哪些 latent $z$ 最可能解释当前 $x$？\nBayes 公式：\n$$ p_\\theta(z|x) = \\frac{ p_\\theta(x|z)p(z) }{ p_\\theta(x) } $$问题又回来了：\n$$ p_\\theta(x) = \\int p(z)p_\\theta(x|z)dz $$难算。\n因此：\n$$ p_\\theta(z|x) $$也通常难算。\n9. 引入 Encoder：approximate posterior 所以引入：\n$$ q_\\phi(z|x) $$去近似：\n$$ p_\\theta(z|x) $$也就是：\n$$ q_\\phi(z|x) \\approx p_\\theta(z|x) $$在标准 VAE 中，Encoder 常输出：\n$$ \\mu_\\phi(x),\\sigma_\\phi(x) $$定义：\n$$ q_\\phi(z|x) = N( \\mu_\\phi(x), \\operatorname{diag}(\\sigma_\\phi^2(x)) ) $$这意味着：\nEncoder 不是把 $x$ 编码成唯一一个 $z$，而是编码成一个关于 $z$ 的分布。\n10. ELBO 是怎么出现的 真正目标仍然是：\n$$ \\log p_\\theta(x) $$先从：\n$$ p_\\theta(x) = \\int p_\\theta(x,z)dz $$开始。\n乘一个 1：\n$$ \\frac{q_\\phi(z|x)}{q_\\phi(z|x)} $$得到：\n$$ p_\\theta(x) = \\int q_\\phi(z|x) \\frac{ p_\\theta(x,z) }{ q_\\phi(z|x) } dz $$根据期望定义：\n$$ E_q[f(z)] = \\int q(z)f(z)dz $$所以：\n$$ p_\\theta(x) = E_{q_\\phi(z|x)} \\left[ \\frac{ p_\\theta(x,z) }{ q_\\phi(z|x) } \\right] $$注意：到这里全部还是等号。\n取 log：\n$$ \\log p_\\theta(x) = \\log E_q \\left[ \\frac{ p_\\theta(x,z) }{ q_\\phi(z|x) } \\right] $$由于 $\\log$ 是凹函数，Jensen 不等式：\n$$ \\log E[Y] \\ge E[\\log Y] $$于是：\n$$ \\log p_\\theta(x) \\ge E_q \\left[ \\log \\frac{ p_\\theta(x,z) }{ q_\\phi(z|x) } \\right] $$右边定义为 ELBO：\n$$ \\boxed{ \\mathcal L_{\\text{ELBO}} = E_q \\left[ \\log \\frac{ p_\\theta(x,z) }{ q_\\phi(z|x) } \\right] } $$\n图 3：Jensen 不等式把难算的 marginal likelihood 变成可优化的下界（ELBO），latent 积分由此进入 variational inference 框架。\n11. 把 ELBO 展开成 VAE loss 联合分布：\n$$ p_\\theta(x,z) = p(z)p_\\theta(x|z) $$代入：\n$$ \\mathcal L_{\\text{ELBO}} = E_q [ \\log p_\\theta(x|z) + \\log p(z) - \\log q_\\phi(z|x) ] $$整理：\n$$ \\boxed{ \\mathcal L_{\\text{ELBO}} = E_q[ \\log p_\\theta(x|z) ] - KL( q_\\phi(z|x) \\| p(z) ) } $$因此如果用 loss 最小化形式：\n$$ \\boxed{ L_{\\text{VAE}} = -\\mathcal L_{\\text{ELBO}} } $$即：\n$$ \\boxed{ L_{\\text{VAE}} = L_{\\text{reconstruction}} + L_{\\text{KL}} } $$ 12. VAE 训练时代码里到底算什么 给定一张图 $x$。\n12.1 Encoder $$ x \\rightarrow \\mu,\\sigma $$得到：\n$$ q_\\phi(z|x) $$12.2 Reparameterization 采：\n$$ \\epsilon\\sim N(0,I) $$然后：\n$$ z = \\mu+\\sigma\\odot\\epsilon $$12.3 Decoder $$ z\\rightarrow \\hat x $$12.4 Reconstruction loss 如果：\n$$ p_\\theta(x|z) = N(\\hat x,\\sigma_x^2I) $$那么：\n$$ -\\log p_\\theta(x|z) \\propto \\|x-\\hat x\\|^2 $$所以常见实现就是 MSE。\n如果采用 Bernoulli likelihood，则常对应 BCE。\n12.5 KL loss 如果：\n$$ q_\\phi(z|x)=N(\\mu,\\sigma^2) $$且：\n$$ p(z)=N(0,I) $$那么 KL 有闭式：\n$$ KL(q||p) = \\frac12 \\sum_j \\left( \\mu_j^2+\\sigma_j^2-\\log \\sigma_j^2-1 \\right) $$ 13. 从 VAE 转向世界模型：不要直接“替换符号” 现在重新从环境本身开始推。\n假设我们已经维护一个 latent state：\n$$ z_{t-1} $$执行动作：\n$$ a_{t-1} $$那么模型需要预测：\n$$ \\boxed{ p_\\theta(z_t|z_{t-1},a_{t-1}) } $$这就是 dynamics prior。\n它回答：\n不看当前真实 observation，只根据过去和动作，我认为当前 latent state 应该是什么。\n14. 为什么只有 dynamics prior 不够 因为预测会有误差。\n原因包括：\n环境随机性 actuator noise hidden disturbance model error 上一时刻 latent 本身的不确定性 于是当前真实 observation：\n$$ o_t $$来了以后，我们希望利用它修正对 $z_t$ 的判断。\n因此需要：\n$$ \\boxed{ q_\\phi( z_t | z_{t-1},a_{t-1},o_t ) } $$这就是 filtered posterior / inference model。\n图 4：Dynamics prior 只基于过去预测当前状态；filtered posterior 额外利用当前观测 $o_t$ 修正状态估计。\n它对应：\n$$ \\boxed{ \\text{predict} \\rightarrow \\text{observe} \\rightarrow \\text{correct} } $$ 15. 为什么还需要 observation model 只定义一个 latent $z_t$ 还不够。\n否则模型完全可以学出一个毫无意义的内部编码。\n所以需要：\n$$ \\boxed{ p_\\theta(o_t|z_t) } $$要求：\n当前 latent state 必须能解释真实 observation。\n这样 $z_t$ 才被迫包含和真实世界相关的信息。\n16. Sequential Latent World Model 的三个核心模块 于是自然得到：\n16.1 Dynamics Prior $$ p_\\theta(z_t|z_{t-1},a_{t-1}) $$不看 $o_t$，只做预测。\n16.2 Filtered Posterior $$ q_\\phi(z_t|z_{t-1},a_{t-1},o_t) $$看到了真实 $o_t$，对预测进行修正。\n16.3 Observation Model $$ p_\\theta(o_t|z_t) $$保证 latent 能解释真实世界。\n17. 整个生成模型怎么写 初始状态：\n$$ z_0\\sim p(z_0) $$每一步：\n$$ z_t \\sim p_\\theta(z_t|z_{t-1},a_{t-1}) $$然后：\n$$ o_t \\sim p_\\theta(o_t|z_t) $$所以：\n$$ \\boxed{ p_\\theta( o_{1:T},z_{0:T} | a_{0:T-1} ) = p_\\theta(z_0) \\prod_{t=1}^{T} p_\\theta(z_t|z_{t-1},a_{t-1}) p_\\theta(o_t|z_t) } $$ 18. 世界模型真正想最大化什么 训练数据里真正观测到的是：\n$$ o_{1:T},a_{0:T-1} $$而不是：\n$$ z_{0:T} $$所以真正想最大化的是：\n$$ \\boxed{ \\log p_\\theta( o_{1:T} | a_{0:T-1} ) } $$由于 latent trajectory 没有观测：\n$$ p_\\theta(o_{1:T}|a) = \\int p_\\theta(o_{1:T},z_{0:T}|a) dz_{0:T} $$这个积分一般仍然难算。\n19. 为什么真实 posterior 也难算 真实 posterior 是：\n$$ p_\\theta( z_{0:T} | o_{1:T},a_{0:T-1} ) $$即：\n已经看到整段 observation 和 action 后，整条 latent trajectory 最可能是什么。\n即使只看单步：\n$$ p_\\theta( z_t | z_{t-1},a_{t-1},o_t ) $$根据 Bayes：\n$$ p_\\theta( z_t | z_{t-1},a_{t-1},o_t ) = \\frac{ p_\\theta(o_t|z_t) p_\\theta(z_t|z_{t-1},a_{t-1}) }{ p_\\theta(o_t|z_{t-1},a_{t-1}) } $$分母：\n$$ p_\\theta(o_t|z_{t-1},a_{t-1}) = \\int p_\\theta(o_t|z_t) p_\\theta(z_t|z_{t-1},a_{t-1}) dz_t $$又出现了 nonlinear high-dimensional integral。\n所以一般需要 approximate posterior：\n$$ q_\\phi( z_t | z_{t-1},a_{t-1},o_t ) $$ 20. 世界模型 ELBO 的推导 目标：\n$$ \\log p_\\theta(o_{1:T}|a_{0:T-1}) $$引入：\n$$ q_\\phi(z_{0:T}|o_{1:T},a_{0:T-1}) $$和 VAE 一样：\n$$ p_\\theta(o|a) = \\int q_\\phi(z|o,a) \\frac{ p_\\theta(o,z|a) }{ q_\\phi(z|o,a) } dz $$写成期望：\n$$ p_\\theta(o|a) = E_q \\left[ \\frac{ p_\\theta(o,z|a) }{ q_\\phi(z|o,a) } \\right] $$取 log，再用 Jensen：\n$$ \\log p_\\theta(o|a) \\ge E_q \\left[ \\log \\frac{ p_\\theta(o,z|a) }{ q_\\phi(z|o,a) } \\right] $$这就是 sequential ELBO。\n21. 利用 Markov factorization 展开 生成模型：\n$$ p_\\theta(o,z|a) = p_\\theta(z_0) \\prod_{t=1}^{T} p_\\theta(z_t|z_{t-1},a_{t-1}) p_\\theta(o_t|z_t) $$近似 posterior：\n$$ q_\\phi(z|o,a) = q_\\phi(z_0|o_0) \\prod_{t=1}^{T} q_\\phi( z_t | z_{t-1},a_{t-1},o_t ) $$代入并整理以后：\n$$ \\boxed{ \\mathcal L_{\\text{WM}} = \\sum_{t=1}^{T} E_q[ \\log p_\\theta(o_t|z_t) ] - \\sum_{t=1}^{T} KL(q_t||p_t) - KL(q(z_0|o_0)||p(z_0)) } $$其中：\n$$ q_t = q_\\phi( z_t | z_{t-1},a_{t-1},o_t ) $$$$ p_t = p_\\theta( z_t | z_{t-1},a_{t-1} ) $$ 22. 世界模型的 loss 训练时通常最小化 negative ELBO：\n$$ \\boxed{ L_{\\text{WM}} = -\\mathcal L_{\\text{WM}} } $$所以：\n$$ \\boxed{ L_{\\text{WM}} = \\sum_t L_{\\text{reconstruction},t} + \\sum_t L_{\\text{dynamics KL},t} + L_{\\text{initial KL}} } $$如果暂时忽略初始状态：\n$$ \\boxed{ L_t = -\\mathbb E_{q_t} [ \\log p_\\theta(o_t|z_t) ] + KL(q_t||p_t) } $$ 23. 两项 loss 分别约束什么 23.1 Reconstruction / Observation Loss $$ -\\log p_\\theta(o_t|z_t) $$要求：\n$$ \\boxed{ z_t \\text{ 能解释当前真实世界} } $$也就是：\n$$ z_t \\rightarrow \\hat o_t \\approx o_t $$ 23.2 Dynamics KL $$ KL(q_t||p_t) $$其中：\n$$ q_t = q(z_t|z_{t-1},a_{t-1},o_t) $$看过真实 observation。\n而：\n$$ p_t = p(z_t|z_{t-1},a_{t-1}) $$没看当前 observation。\n所以这一项要求：\n$$ \\boxed{ \\text{仅靠过去预测出的 state} \\approx \\text{看过真实世界后修正出的 state} } $$换句话说：\n$$ \\boxed{ z_t \\text{ 必须能从过去和动作预测出来} } $$ 24. 最核心的理解 world model 没有 latent state 的 ground-truth label。\n所以不能直接监督：\n$$ \\hat z_t \\approx z_t^* $$而是利用两个约束把 latent state “夹”出来：\n$$ \\boxed{ \\text{可解释当前 observation} } $$以及：\n$$ \\boxed{ \\text{可由过去和 action 预测} } $$因此一个好的 world state 应同时满足：\n$$ \\boxed{ \\text{observable} + \\text{predictable} } $$这就是经典 latent world model 最核心的 inductive bias。\n图 5：由于没有 latent ground truth，模型通过“可解释当前观测”和“可由过去预测”两类约束共同塑造 $z_t$。\n25. 和 VAE 的关系到底是什么 不要把它理解成：\n“世界模型就是把 VAE 的 $x,z$ 加个时间下标。”\n更准确的是：\n世界模型从 POMDP / state-space model 出发，而 VAE 提供了训练 latent generative model 的 variational inference 工具。\n静态 VAE：\n$$ p(z),\\quad q(z|x),\\quad p(x|z) $$Sequential latent world model：\n$$ p(z_t|z_{t-1},a_{t-1}) $$$$ q(z_t|z_{t-1},a_{t-1},o_t) $$$$ p(o_t|z_t) $$真正的变化是：\n$$ \\boxed{ \\text{static prior} \\rightarrow \\text{action-conditioned dynamic prior} } $$于是：\n$$ \\boxed{ \\text{VAE-style variational inference} + \\text{state-space dynamics} = \\text{经典 latent world model 的训练骨架} } $$\n图 6：从结构上看，最核心的变化是 static prior 变成 action-conditioned dynamic prior；其余 variational inference 逻辑保持一致。\n26. 一张总逻辑图 现实世界部分可观测 │ ▼ 真实 state s_t 看不到，只能看到 observation o_t │ ▼ 引入 latent state z_t │ ├───────────────┐ ▼ ▼ 能解释当前世界 能预测未来世界 p(o_t | z_t) p(z_t | z_{t-1}, a_{t-1}) ▲ │ │ │ └──── q(z_t | z_{t-1}, a_{t-1}, o_t) 用真实 observation 修正 state │ ▼ latent 没有 ground truth │ ▼ variational inference │ ▼ ELBO │ ┌──────────────┴──────────────┐ ▼ ▼ reconstruction dynamics KL 解释当前 observation prior 接近 posterior │ │ └──────────────┬──────────────┘ ▼ 学到“可解释 + 可预测”的 latent world state 27. 如果继续往 PlaNet / Dreamer 看 到这里以后，再读经典方法会容易很多：\nWorld Models：encoder → latent dynamics → controller PlaNet：把 latent dynamics 做成 RSSM，并在 latent space 规划 Dreamer：不只在 latent 里规划，而是在 imagined latent rollout 中训练 actor/value 之后的研究虽然表示形式、backbone、训练目标越来越复杂，但很多工作仍然围绕几个老问题：\nlatent 里应该保留什么？ dynamics 应该如何建模？ reconstruction 是否必要？ prior / posterior 应该如何对齐？ world model 是服务某个 policy，还是做通用 simulator？ 是否需要 pixel、token、BEV、occupancy、3DGS 等更显式的空间结构？ 28. 最终压缩 如果只记一句：\n$$ \\boxed{ \\text{World Model} = \\text{State Representation} + \\text{Dynamics} + \\text{Decision Interface} } $$如果只记它的训练逻辑：\n$$ \\boxed{ \\text{没有 latent label} \\Rightarrow \\text{让 latent 同时“解释现在”并“可预测未来”} } $$如果只记最经典的 sequential latent world model loss：\n$$ \\boxed{ L_t = L_{\\text{reconstruction}} + KL( q(z_t|z_{t-1},a_{t-1},o_t) \\| p(z_t|z_{t-1},a_{t-1}) ) } $$这三句话基本就是从 VAE 到经典 latent world model 的主干。\n","wordCount":"1456","inLanguage":"en","datePublished":"2026-09-27T00:00:00Z","dateModified":"2026-09-27T00:00:00Z","author":{"@type":"Person","name":"LetsGetAI"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://letsgetai.github.io/posts/vae-to-world-model/"},"publisher":{"@type":"Organization","name":"The Herta","logo":{"@type":"ImageObject","url":"https://letsgetai.github.io/favicon.ico"}}}</script></head><body id=top><header class=header><nav class=header-nav><div class=logo><a href=https://letsgetai.github.io/ accesskey=h title="The Herta (Alt + H)">The Herta</a><div class=logo-switches><button id=theme-toggle class=theme-toggle accesskey=t title="(Alt + T)" aria-label="Toggle theme">
+<svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+<svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button></div></div><ul id=menu class=menu><li><a href=https://letsgetai.github.io/ title=首页><span>首页</span></a></li><li><a href=https://letsgetai.github.io/archives/ title=归档><span>归档</span></a></li><li><a href=https://letsgetai.github.io/about/ title=关于><span>关于</span></a></li><li><a href=https://letsgetai.github.io/categories/ title=分类><span>分类</span></a></li><li><a href=https://github.com/letsgetai title=GitHub><span>GitHub</span>&nbsp;
+<svg fill="none" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" height="12" width="12"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a></li></ul></nav></header><main class=main><article class=post-single><header class=post-header><nav class=breadcrumbs role=navigation aria-label=Breadcrumb><a href=/>主页</a>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"/></svg>
+<a href=/posts/>Posts</a>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"/></svg></nav><h1 class="post-title entry-hint-parent">从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）</h1><div class=post-meta><span title='2026-09-27 00:00:00 +0000 UTC'>2026-09-27</span>&nbsp;·&nbsp;<span>7 分钟</span>&nbsp;·&nbsp;<span>1456 字</span>&nbsp;·&nbsp;<span>LetsGetAI</span></div></header><div class="post-content md-content"><blockquote><p>目标：用一条连续的逻辑链，把“世界模型是什么、为什么需要 latent state、为什么会出现 posterior、ELBO 从哪里来、世界模型的 loss 为什么长成 reconstruction + dynamics KL”讲清楚。<br>这不是论文综述，而是一份偏“推导 + 直觉”的入门笔记。</p></blockquote><hr><h2 id=1-世界模型到底是什么>1. 世界模型到底是什么<a hidden class=anchor aria-hidden=true href=#1-世界模型到底是什么>#</a></h2><p>最核心的直觉是：</p><blockquote><p><strong>世界模型学习一个内部世界状态，并预测这个世界在动作作用下如何变化。</strong></p></blockquote><p>最简形式：</p>$$
+(z_t, a_t) \rightarrow z_{t+1}
+$$<p>其中：</p><ul><li>$o_t$：当前观测（图像、深度、传感器等）</li><li>$s_t$：真实世界状态，通常不可直接观测</li><li>$z_t$：模型内部学习到的 latent state</li><li>$a_t$：动作</li></ul><p>可以把世界模型拆成三个模块：</p>$$
+\boxed{
+\text{Representation}
++
+\text{Dynamics}
++
+\text{Decision Interface}
+}
+$$<p>对应：</p>$$
+o_t \rightarrow z_t
+$$$$
+(z_t,a_t)\rightarrow z_{t+1}
+$$$$
+z_t \rightarrow a_t
+$$<p>其中第三项不一定直接内置在 world model 本体里，也可能由 policy / planner 负责。</p><p><img alt=世界模型的最小结构 loading=lazy src=/images/vae-to-world-model/fig01_world_model_architecture.svg></p><p><em>图 1：世界模型最小结构。表示模块把观测压缩为内部状态，动力学模块预测动作作用后的状态变化，决策接口利用内部状态产生动作。</em></p><hr><h2 id=2-为什么会自然进入-pomdp>2. 为什么会自然进入 POMDP<a hidden class=anchor aria-hidden=true href=#2-为什么会自然进入-pomdp>#</a></h2><p>现实里，agent 通常看不到真正的状态 $s_t$，只能看到观测 $o_t$。</p><p>因此我们可以写：</p>$$
+s_t \rightarrow o_t
+$$<p>而状态在动作作用下变化：</p>$$
+p(s_t|s_{t-1},a_{t-1})
+$$<p>于是，一个最基本的生成过程是：</p>$$
+s_{t-1},a_{t-1}\rightarrow s_t \rightarrow o_t
+$$<p>整个联合分布可以写成：</p>$$
+p(s_{0:T},o_{1:T}|a_{0:T-1}) =
+p(s_0)
+\prod_{t=1}^{T}
+p(s_t|s_{t-1},a_{t-1})
+p(o_t|s_t)
+$$<p>这个式子来自两件事：</p><ol><li>联合概率的 chain rule</li><li>POMDP / Markov 假设带来的条件独立性</li></ol><hr><h2 id=3-为什么要引入-latent-state>3. 为什么要引入 latent state<a hidden class=anchor aria-hidden=true href=#3-为什么要引入-latent-state>#</a></h2><p>真实 $s_t$ 通常不可见。</p><p>比如机器人真正的世界状态可能包含：</p><ul><li>所有物体的 3D 位置</li><li>速度</li><li>遮挡物体</li><li>接触状态</li><li>摩擦系数</li><li>材质</li><li>其他 agent 的内部状态</li></ul><p>但 agent 只能看到 RGB、Depth、Proprioception 等观测。</p><p>因此我们引入一个学习得到的内部状态：</p>$$
+z_t
+$$<p>希望它成为：</p>$$
+z_t \approx \text{history 的有效压缩}
+$$<p>也就是：</p>$$
+z_t \approx f(o_{\le t},a_{\lt t})
+$$<p>并且它应该满足两个要求：</p>$$
+\boxed{
+\text{能解释当前世界}
+}
+$$<p>以及：</p>$$
+\boxed{
+\text{能从过去预测出来}
+}
+$$<p>后面 world model 的 loss，本质上就是在同时约束这两件事。</p><hr><h2 id=4-先从静态-vae-开始>4. 先从静态 VAE 开始<a hidden class=anchor aria-hidden=true href=#4-先从静态-vae-开始>#</a></h2><p>世界模型的 variational learning 很像 VAE，所以先把 VAE 的逻辑推清楚。</p><h3 id=41-vae-的生成假设>4.1 VAE 的生成假设<a hidden class=anchor aria-hidden=true href=#41-vae-的生成假设>#</a></h3><p>假设一张图片 $x$ 是由 latent variable $z$ 生成的：</p>$$
+z \sim p(z)
+$$$$
+x \sim p_\theta(x|z)
+$$<p>其中：</p><ul><li>$p(z)$：latent prior，通常取 $N(0,I)$</li><li>$p_\theta(x|z)$：decoder / likelihood</li><li>$\theta$：decoder 的参数</li></ul><p>所以联合分布：</p>$$
+p_\theta(x,z) =
+p(z)p_\theta(x|z)
+$$<p><img alt="VAE 的生成方向与推断方向" loading=lazy src=/images/vae-to-world-model/fig02_vae_generative_inference.svg></p><p><em>图 2：VAE 同时包含生成方向（$z\rightarrow x$）和推断方向（$x\rightarrow q_\phi(z|x)$）。</em></p><hr><h2 id=5-vae-真正想优化什么>5. VAE 真正想优化什么<a hidden class=anchor aria-hidden=true href=#5-vae-真正想优化什么>#</a></h2><p>我们的目标不是“重建图片”本身，而是 maximum likelihood：</p>$$
+\boxed{
+\max_\theta \log p_\theta(x)
+}
+$$<p>也就是说：</p><blockquote><p>希望训练数据 $x$ 在模型下出现的概率尽可能大。</p></blockquote><p>由于 $z$ 没有被观测到：</p>$$
+p_\theta(x) =
+\int p_\theta(x,z)\,dz
+$$<p>展开：</p>$$
+p_\theta(x) =
+\int p(z)p_\theta(x|z)\,dz
+$$<p>这个积分的含义是：</p><blockquote><p>把所有可能生成当前 $x$ 的 latent $z$ 的贡献全部加起来。</p></blockquote><hr><h2 id=6-为什么这个积分难算>6. 为什么这个积分难算<a hidden class=anchor aria-hidden=true href=#6-为什么这个积分难算>#</a></h2><p>难点不是 $p_\theta(x|z)$ 本身不能算。</p><p>给定一个具体 $x,z$，通常可以直接计算：</p>$$
+p_\theta(x|z)
+$$<p>真正难的是：</p>$$
+p_\theta(x) =
+\int p(z)p_\theta(x|z)\,dz
+$$<p>原因主要有两个。</p><h3 id=61--是高维连续变量>6.1 $z$ 是高维连续变量<a hidden class=anchor aria-hidden=true href=#61--是高维连续变量>#</a></h3><p>例如：</p>$$
+z\in \mathbb R^{128}
+$$<p>这就是一个 128 维积分。</p><h3 id=62-decoder-关于--是复杂非线性函数>6.2 Decoder 关于 $z$ 是复杂非线性函数<a hidden class=anchor aria-hidden=true href=#62-decoder-关于--是复杂非线性函数>#</a></h3><p>例如：</p>$$
+p_\theta(x|z) =
+N(x;f_\theta(z),\sigma^2I)
+$$<p>其中：</p>$$
+f_\theta(z)
+$$<p>是一个深度神经网络。</p><p>于是：</p>$$
+p_\theta(x) =
+\int
+N(z;0,I)
+N(x;f_\theta(z),\sigma^2I)
+dz
+$$<p>一般没有解析解。</p><hr><h2 id=7-monte-carlo-能不能近似这个积分>7. Monte Carlo 能不能近似这个积分<a hidden class=anchor aria-hidden=true href=#7-monte-carlo-能不能近似这个积分>#</a></h2><p>可以。</p><p>因为：</p>$$
+p_\theta(x) =
+E_{z\sim p(z)}
+[p_\theta(x|z)]
+$$<p>因此可以从 prior 中采样：</p>$$
+z^{(1)},\dots,z^{(K)}
+\sim p(z)
+$$<p>然后：</p>$$
+p_\theta(x)
+\approx
+\frac{1}{K}
+\sum_{k=1}^{K}
+p_\theta(x|z^{(k)})
+$$<p>这就是 Monte Carlo estimation。</p><p>问题是：</p><blockquote><p>对当前特定的 $x$，从整个 prior $p(z)$ 乱采，大部分 $z$ 都不能很好解释它。</p></blockquote><p>所以估计效率低、方差大。</p><hr><h2 id=8-我们真正希望知道的是-posterior>8. 我们真正希望知道的是 posterior<a hidden class=anchor aria-hidden=true href=#8-我们真正希望知道的是-posterior>#</a></h2><p>给定当前 $x$，我们更希望知道：</p>$$
+p_\theta(z|x)
+$$<p>它回答：</p><blockquote><p>哪些 latent $z$ 最可能解释当前 $x$？</p></blockquote><p>Bayes 公式：</p>$$
+p_\theta(z|x) =
+\frac{
+p_\theta(x|z)p(z)
+}{
+p_\theta(x)
+}
+$$<p>问题又回来了：</p>$$
+p_\theta(x) =
+\int p(z)p_\theta(x|z)dz
+$$<p>难算。</p><p>因此：</p>$$
+p_\theta(z|x)
+$$<p>也通常难算。</p><hr><h2 id=9-引入-encoderapproximate-posterior>9. 引入 Encoder：approximate posterior<a hidden class=anchor aria-hidden=true href=#9-引入-encoderapproximate-posterior>#</a></h2><p>所以引入：</p>$$
+q_\phi(z|x)
+$$<p>去近似：</p>$$
+p_\theta(z|x)
+$$<p>也就是：</p>$$
+q_\phi(z|x)
+\approx
+p_\theta(z|x)
+$$<p>在标准 VAE 中，Encoder 常输出：</p>$$
+\mu_\phi(x),\sigma_\phi(x)
+$$<p>定义：</p>$$
+q_\phi(z|x) =
+N(
+\mu_\phi(x),
+\operatorname{diag}(\sigma_\phi^2(x))
+)
+$$<p>这意味着：</p><blockquote><p>Encoder 不是把 $x$ 编码成唯一一个 $z$，而是编码成一个关于 $z$ 的分布。</p></blockquote><hr><h2 id=10-elbo-是怎么出现的>10. ELBO 是怎么出现的<a hidden class=anchor aria-hidden=true href=#10-elbo-是怎么出现的>#</a></h2><p>真正目标仍然是：</p>$$
+\log p_\theta(x)
+$$<p>先从：</p>$$
+p_\theta(x) =
+\int p_\theta(x,z)dz
+$$<p>开始。</p><p>乘一个 1：</p>$$
+\frac{q_\phi(z|x)}{q_\phi(z|x)}
+$$<p>得到：</p>$$
+p_\theta(x) =
+\int
+q_\phi(z|x)
+\frac{
+p_\theta(x,z)
+}{
+q_\phi(z|x)
+}
+dz
+$$<p>根据期望定义：</p>$$
+E_q[f(z)] =
+\int q(z)f(z)dz
+$$<p>所以：</p>$$
+p_\theta(x) =
+E_{q_\phi(z|x)}
+\left[
+\frac{
+p_\theta(x,z)
+}{
+q_\phi(z|x)
+}
+\right]
+$$<p>注意：到这里全部还是等号。</p><p>取 log：</p>$$
+\log p_\theta(x) =
+\log
+E_q
+\left[
+\frac{
+p_\theta(x,z)
+}{
+q_\phi(z|x)
+}
+\right]
+$$<p>由于 $\log$ 是凹函数，Jensen 不等式：</p>$$
+\log E[Y]
+\ge
+E[\log Y]
+$$<p>于是：</p>$$
+\log p_\theta(x)
+\ge
+E_q
+\left[
+\log
+\frac{
+p_\theta(x,z)
+}{
+q_\phi(z|x)
+}
+\right]
+$$<p>右边定义为 ELBO：</p>$$
+\boxed{
+\mathcal L_{\text{ELBO}} =
+E_q
+\left[
+\log
+\frac{
+p_\theta(x,z)
+}{
+q_\phi(z|x)
+}
+\right]
+}
+$$<p><img alt="ELBO 为什么出现" loading=lazy src=/images/vae-to-world-model/fig03_elbo_derivation.svg></p><p><em>图 3：Jensen 不等式把难算的 marginal likelihood 变成可优化的下界（ELBO），latent 积分由此进入 variational inference 框架。</em></p><hr><h2 id=11-把-elbo-展开成-vae-loss>11. 把 ELBO 展开成 VAE loss<a hidden class=anchor aria-hidden=true href=#11-把-elbo-展开成-vae-loss>#</a></h2><p>联合分布：</p>$$
+p_\theta(x,z) =
+p(z)p_\theta(x|z)
+$$<p>代入：</p>$$
+\mathcal L_{\text{ELBO}} =
+E_q
+[
+\log p_\theta(x|z)
++
+\log p(z) -
+\log q_\phi(z|x)
+]
+$$<p>整理：</p>$$
+\boxed{
+\mathcal L_{\text{ELBO}} =
+E_q[
+\log p_\theta(x|z)
+] -
+KL(
+q_\phi(z|x)
+\|
+p(z)
+)
+}
+$$<p>因此如果用 loss 最小化形式：</p>$$
+\boxed{
+L_{\text{VAE}} =
+-\mathcal L_{\text{ELBO}}
+}
+$$<p>即：</p>$$
+\boxed{
+L_{\text{VAE}} =
+L_{\text{reconstruction}}
++
+L_{\text{KL}}
+}
+$$<hr><h2 id=12-vae-训练时代码里到底算什么>12. VAE 训练时代码里到底算什么<a hidden class=anchor aria-hidden=true href=#12-vae-训练时代码里到底算什么>#</a></h2><p>给定一张图 $x$。</p><h3 id=121-encoder>12.1 Encoder<a hidden class=anchor aria-hidden=true href=#121-encoder>#</a></h3>$$
+x
+\rightarrow
+\mu,\sigma
+$$<p>得到：</p>$$
+q_\phi(z|x)
+$$<h3 id=122-reparameterization>12.2 Reparameterization<a hidden class=anchor aria-hidden=true href=#122-reparameterization>#</a></h3><p>采：</p>$$
+\epsilon\sim N(0,I)
+$$<p>然后：</p>$$
+z =
+\mu+\sigma\odot\epsilon
+$$<h3 id=123-decoder>12.3 Decoder<a hidden class=anchor aria-hidden=true href=#123-decoder>#</a></h3>$$
+z\rightarrow \hat x
+$$<h3 id=124-reconstruction-loss>12.4 Reconstruction loss<a hidden class=anchor aria-hidden=true href=#124-reconstruction-loss>#</a></h3><p>如果：</p>$$
+p_\theta(x|z) =
+N(\hat x,\sigma_x^2I)
+$$<p>那么：</p>$$
+-\log p_\theta(x|z)
+\propto
+\|x-\hat x\|^2
+$$<p>所以常见实现就是 MSE。</p><p>如果采用 Bernoulli likelihood，则常对应 BCE。</p><h3 id=125-kl-loss>12.5 KL loss<a hidden class=anchor aria-hidden=true href=#125-kl-loss>#</a></h3><p>如果：</p>$$
+q_\phi(z|x)=N(\mu,\sigma^2)
+$$<p>且：</p>$$
+p(z)=N(0,I)
+$$<p>那么 KL 有闭式：</p>$$
+KL(q||p) =
+\frac12
+\sum_j
+\left(
+\mu_j^2+\sigma_j^2-\log \sigma_j^2-1
+\right)
+$$<hr><h2 id=13-从-vae-转向世界模型不要直接替换符号>13. 从 VAE 转向世界模型：不要直接“替换符号”<a hidden class=anchor aria-hidden=true href=#13-从-vae-转向世界模型不要直接替换符号>#</a></h2><p>现在重新从环境本身开始推。</p><p>假设我们已经维护一个 latent state：</p>$$
+z_{t-1}
+$$<p>执行动作：</p>$$
+a_{t-1}
+$$<p>那么模型需要预测：</p>$$
+\boxed{
+p_\theta(z_t|z_{t-1},a_{t-1})
+}
+$$<p>这就是 dynamics prior。</p><p>它回答：</p><blockquote><p>不看当前真实 observation，只根据过去和动作，我认为当前 latent state 应该是什么。</p></blockquote><hr><h2 id=14-为什么只有-dynamics-prior-不够>14. 为什么只有 dynamics prior 不够<a hidden class=anchor aria-hidden=true href=#14-为什么只有-dynamics-prior-不够>#</a></h2><p>因为预测会有误差。</p><p>原因包括：</p><ul><li>环境随机性</li><li>actuator noise</li><li>hidden disturbance</li><li>model error</li><li>上一时刻 latent 本身的不确定性</li></ul><p>于是当前真实 observation：</p>$$
+o_t
+$$<p>来了以后，我们希望利用它修正对 $z_t$ 的判断。</p><p>因此需要：</p>$$
+\boxed{
+q_\phi(
+z_t
+|
+z_{t-1},a_{t-1},o_t
+)
+}
+$$<p>这就是 filtered posterior / inference model。</p><p><img alt="Sequential world model 的预测与修正" loading=lazy src=/images/vae-to-world-model/fig04_sequential_world_model.svg></p><p><em>图 4：Dynamics prior 只基于过去预测当前状态；filtered posterior 额外利用当前观测 $o_t$ 修正状态估计。</em></p><p>它对应：</p>$$
+\boxed{
+\text{predict}
+\rightarrow
+\text{observe}
+\rightarrow
+\text{correct}
+}
+$$<hr><h2 id=15-为什么还需要-observation-model>15. 为什么还需要 observation model<a hidden class=anchor aria-hidden=true href=#15-为什么还需要-observation-model>#</a></h2><p>只定义一个 latent $z_t$ 还不够。</p><p>否则模型完全可以学出一个毫无意义的内部编码。</p><p>所以需要：</p>$$
+\boxed{
+p_\theta(o_t|z_t)
+}
+$$<p>要求：</p><blockquote><p>当前 latent state 必须能解释真实 observation。</p></blockquote><p>这样 $z_t$ 才被迫包含和真实世界相关的信息。</p><hr><h2 id=16-sequential-latent-world-model-的三个核心模块>16. Sequential Latent World Model 的三个核心模块<a hidden class=anchor aria-hidden=true href=#16-sequential-latent-world-model-的三个核心模块>#</a></h2><p>于是自然得到：</p><h3 id=161-dynamics-prior>16.1 Dynamics Prior<a hidden class=anchor aria-hidden=true href=#161-dynamics-prior>#</a></h3>$$
+p_\theta(z_t|z_{t-1},a_{t-1})
+$$<p>不看 $o_t$，只做预测。</p><h3 id=162-filtered-posterior>16.2 Filtered Posterior<a hidden class=anchor aria-hidden=true href=#162-filtered-posterior>#</a></h3>$$
+q_\phi(z_t|z_{t-1},a_{t-1},o_t)
+$$<p>看到了真实 $o_t$，对预测进行修正。</p><h3 id=163-observation-model>16.3 Observation Model<a hidden class=anchor aria-hidden=true href=#163-observation-model>#</a></h3>$$
+p_\theta(o_t|z_t)
+$$<p>保证 latent 能解释真实世界。</p><hr><h2 id=17-整个生成模型怎么写>17. 整个生成模型怎么写<a hidden class=anchor aria-hidden=true href=#17-整个生成模型怎么写>#</a></h2><p>初始状态：</p>$$
+z_0\sim p(z_0)
+$$<p>每一步：</p>$$
+z_t
+\sim
+p_\theta(z_t|z_{t-1},a_{t-1})
+$$<p>然后：</p>$$
+o_t
+\sim
+p_\theta(o_t|z_t)
+$$<p>所以：</p>$$
+\boxed{
+p_\theta(
+o_{1:T},z_{0:T}
+|
+a_{0:T-1}
+) =
+p_\theta(z_0)
+\prod_{t=1}^{T}
+p_\theta(z_t|z_{t-1},a_{t-1})
+p_\theta(o_t|z_t)
+}
+$$<hr><h2 id=18-世界模型真正想最大化什么>18. 世界模型真正想最大化什么<a hidden class=anchor aria-hidden=true href=#18-世界模型真正想最大化什么>#</a></h2><p>训练数据里真正观测到的是：</p>$$
+o_{1:T},a_{0:T-1}
+$$<p>而不是：</p>$$
+z_{0:T}
+$$<p>所以真正想最大化的是：</p>$$
+\boxed{
+\log p_\theta(
+o_{1:T}
+|
+a_{0:T-1}
+)
+}
+$$<p>由于 latent trajectory 没有观测：</p>$$
+p_\theta(o_{1:T}|a) =
+\int
+p_\theta(o_{1:T},z_{0:T}|a)
+dz_{0:T}
+$$<p>这个积分一般仍然难算。</p><hr><h2 id=19-为什么真实-posterior-也难算>19. 为什么真实 posterior 也难算<a hidden class=anchor aria-hidden=true href=#19-为什么真实-posterior-也难算>#</a></h2><p>真实 posterior 是：</p>$$
+p_\theta(
+z_{0:T}
+|
+o_{1:T},a_{0:T-1}
+)
+$$<p>即：</p><blockquote><p>已经看到整段 observation 和 action 后，整条 latent trajectory 最可能是什么。</p></blockquote><p>即使只看单步：</p>$$
+p_\theta(
+z_t
+|
+z_{t-1},a_{t-1},o_t
+)
+$$<p>根据 Bayes：</p>$$
+p_\theta(
+z_t
+|
+z_{t-1},a_{t-1},o_t
+) =
+\frac{
+p_\theta(o_t|z_t)
+p_\theta(z_t|z_{t-1},a_{t-1})
+}{
+p_\theta(o_t|z_{t-1},a_{t-1})
+}
+$$<p>分母：</p>$$
+p_\theta(o_t|z_{t-1},a_{t-1}) =
+\int
+p_\theta(o_t|z_t)
+p_\theta(z_t|z_{t-1},a_{t-1})
+dz_t
+$$<p>又出现了 nonlinear high-dimensional integral。</p><p>所以一般需要 approximate posterior：</p>$$
+q_\phi(
+z_t
+|
+z_{t-1},a_{t-1},o_t
+)
+$$<hr><h2 id=20-世界模型-elbo-的推导>20. 世界模型 ELBO 的推导<a hidden class=anchor aria-hidden=true href=#20-世界模型-elbo-的推导>#</a></h2><p>目标：</p>$$
+\log p_\theta(o_{1:T}|a_{0:T-1})
+$$<p>引入：</p>$$
+q_\phi(z_{0:T}|o_{1:T},a_{0:T-1})
+$$<p>和 VAE 一样：</p>$$
+p_\theta(o|a) =
+\int
+q_\phi(z|o,a)
+\frac{
+p_\theta(o,z|a)
+}{
+q_\phi(z|o,a)
+}
+dz
+$$<p>写成期望：</p>$$
+p_\theta(o|a) =
+E_q
+\left[
+\frac{
+p_\theta(o,z|a)
+}{
+q_\phi(z|o,a)
+}
+\right]
+$$<p>取 log，再用 Jensen：</p>$$
+\log p_\theta(o|a)
+\ge
+E_q
+\left[
+\log
+\frac{
+p_\theta(o,z|a)
+}{
+q_\phi(z|o,a)
+}
+\right]
+$$<p>这就是 sequential ELBO。</p><hr><h2 id=21-利用-markov-factorization-展开>21. 利用 Markov factorization 展开<a hidden class=anchor aria-hidden=true href=#21-利用-markov-factorization-展开>#</a></h2><p>生成模型：</p>$$
+p_\theta(o,z|a) =
+p_\theta(z_0)
+\prod_{t=1}^{T}
+p_\theta(z_t|z_{t-1},a_{t-1})
+p_\theta(o_t|z_t)
+$$<p>近似 posterior：</p>$$
+q_\phi(z|o,a) =
+q_\phi(z_0|o_0)
+\prod_{t=1}^{T}
+q_\phi(
+z_t
+|
+z_{t-1},a_{t-1},o_t
+)
+$$<p>代入并整理以后：</p>$$
+\boxed{
+\mathcal L_{\text{WM}} =
+\sum_{t=1}^{T}
+E_q[
+\log p_\theta(o_t|z_t)
+] -
+\sum_{t=1}^{T}
+KL(q_t||p_t) -
+KL(q(z_0|o_0)||p(z_0))
+}
+$$<p>其中：</p>$$
+q_t =
+q_\phi(
+z_t
+|
+z_{t-1},a_{t-1},o_t
+)
+$$$$
+p_t =
+p_\theta(
+z_t
+|
+z_{t-1},a_{t-1}
+)
+$$<hr><h2 id=22-世界模型的-loss>22. 世界模型的 loss<a hidden class=anchor aria-hidden=true href=#22-世界模型的-loss>#</a></h2><p>训练时通常最小化 negative ELBO：</p>$$
+\boxed{
+L_{\text{WM}} =
+-\mathcal L_{\text{WM}}
+}
+$$<p>所以：</p>$$
+\boxed{
+L_{\text{WM}} =
+\sum_t
+L_{\text{reconstruction},t}
++
+\sum_t
+L_{\text{dynamics KL},t}
++
+L_{\text{initial KL}}
+}
+$$<p>如果暂时忽略初始状态：</p>$$
+\boxed{
+L_t =
+-\mathbb E_{q_t}
+[
+\log p_\theta(o_t|z_t)
+]
++
+KL(q_t||p_t)
+}
+$$<hr><h2 id=23-两项-loss-分别约束什么>23. 两项 loss 分别约束什么<a hidden class=anchor aria-hidden=true href=#23-两项-loss-分别约束什么>#</a></h2><h3 id=231-reconstruction--observation-loss>23.1 Reconstruction / Observation Loss<a hidden class=anchor aria-hidden=true href=#231-reconstruction--observation-loss>#</a></h3>$$
+-\log p_\theta(o_t|z_t)
+$$<p>要求：</p>$$
+\boxed{
+z_t \text{ 能解释当前真实世界}
+}
+$$<p>也就是：</p>$$
+z_t
+\rightarrow
+\hat o_t
+\approx
+o_t
+$$<hr><h3 id=232-dynamics-kl>23.2 Dynamics KL<a hidden class=anchor aria-hidden=true href=#232-dynamics-kl>#</a></h3>$$
+KL(q_t||p_t)
+$$<p>其中：</p>$$
+q_t =
+q(z_t|z_{t-1},a_{t-1},o_t)
+$$<p>看过真实 observation。</p><p>而：</p>$$
+p_t =
+p(z_t|z_{t-1},a_{t-1})
+$$<p>没看当前 observation。</p><p>所以这一项要求：</p>$$
+\boxed{
+\text{仅靠过去预测出的 state}
+\approx
+\text{看过真实世界后修正出的 state}
+}
+$$<p>换句话说：</p>$$
+\boxed{
+z_t \text{ 必须能从过去和动作预测出来}
+}
+$$<hr><h2 id=24-最核心的理解>24. 最核心的理解<a hidden class=anchor aria-hidden=true href=#24-最核心的理解>#</a></h2><p>world model 没有 latent state 的 ground-truth label。</p><p>所以不能直接监督：</p>$$
+\hat z_t \approx z_t^*
+$$<p>而是利用两个约束把 latent state “夹”出来：</p>$$
+\boxed{
+\text{可解释当前 observation}
+}
+$$<p>以及：</p>$$
+\boxed{
+\text{可由过去和 action 预测}
+}
+$$<p>因此一个好的 world state 应同时满足：</p>$$
+\boxed{
+\text{observable}
++
+\text{predictable}
+}
+$$<p>这就是经典 latent world model 最核心的 inductive bias。</p><p><img alt="世界模型 loss 的两类约束" loading=lazy src=/images/vae-to-world-model/fig05_world_model_loss.svg></p><p><em>图 5：由于没有 latent ground truth，模型通过“可解释当前观测”和“可由过去预测”两类约束共同塑造 $z_t$。</em></p><hr><h2 id=25-和-vae-的关系到底是什么>25. 和 VAE 的关系到底是什么<a hidden class=anchor aria-hidden=true href=#25-和-vae-的关系到底是什么>#</a></h2><p>不要把它理解成：</p><blockquote><p>“世界模型就是把 VAE 的 $x,z$ 加个时间下标。”</p></blockquote><p>更准确的是：</p><blockquote><p><strong>世界模型从 POMDP / state-space model 出发，而 VAE 提供了训练 latent generative model 的 variational inference 工具。</strong></p></blockquote><p>静态 VAE：</p>$$
+p(z),\quad
+q(z|x),\quad
+p(x|z)
+$$<p>Sequential latent world model：</p>$$
+p(z_t|z_{t-1},a_{t-1})
+$$$$
+q(z_t|z_{t-1},a_{t-1},o_t)
+$$$$
+p(o_t|z_t)
+$$<p>真正的变化是：</p>$$
+\boxed{
+\text{static prior}
+\rightarrow
+\text{action-conditioned dynamic prior}
+}
+$$<p>于是：</p>$$
+\boxed{
+\text{VAE-style variational inference}
++
+\text{state-space dynamics} =
+\text{经典 latent world model 的训练骨架}
+}
+$$<p><img alt="VAE 与 Sequential World Model 的结构对应" loading=lazy src=/images/vae-to-world-model/fig06_vae_to_world_model.svg></p><p><em>图 6：从结构上看，最核心的变化是 static prior 变成 action-conditioned dynamic prior；其余 variational inference 逻辑保持一致。</em></p><hr><h2 id=26-一张总逻辑图>26. 一张总逻辑图<a hidden class=anchor aria-hidden=true href=#26-一张总逻辑图>#</a></h2><div class=highlight><pre tabindex=0 style=background-color:#f7f7f7;-moz-tab-size:4;-o-tab-size:4;tab-size:4;-webkit-text-size-adjust:none><code class=language-text data-lang=text><span style=display:flex><span>现实世界部分可观测
+</span></span><span style=display:flex><span>        │
+</span></span><span style=display:flex><span>        ▼
+</span></span><span style=display:flex><span>真实 state s_t 看不到，只能看到 observation o_t
+</span></span><span style=display:flex><span>        │
+</span></span><span style=display:flex><span>        ▼
+</span></span><span style=display:flex><span>引入 latent state z_t
+</span></span><span style=display:flex><span>        │
+</span></span><span style=display:flex><span>        ├───────────────┐
+</span></span><span style=display:flex><span>        ▼               ▼
+</span></span><span style=display:flex><span>能解释当前世界        能预测未来世界
+</span></span><span style=display:flex><span>p(o_t | z_t)          p(z_t | z_{t-1}, a_{t-1})
+</span></span><span style=display:flex><span>        ▲               │
+</span></span><span style=display:flex><span>        │               │
+</span></span><span style=display:flex><span>        └──── q(z_t | z_{t-1}, a_{t-1}, o_t)
+</span></span><span style=display:flex><span>             用真实 observation 修正 state
+</span></span><span style=display:flex><span>                         │
+</span></span><span style=display:flex><span>                         ▼
+</span></span><span style=display:flex><span>              latent 没有 ground truth
+</span></span><span style=display:flex><span>                         │
+</span></span><span style=display:flex><span>                         ▼
+</span></span><span style=display:flex><span>                  variational inference
+</span></span><span style=display:flex><span>                         │
+</span></span><span style=display:flex><span>                         ▼
+</span></span><span style=display:flex><span>                       ELBO
+</span></span><span style=display:flex><span>                         │
+</span></span><span style=display:flex><span>          ┌──────────────┴──────────────┐
+</span></span><span style=display:flex><span>          ▼                             ▼
+</span></span><span style=display:flex><span> reconstruction                     dynamics KL
+</span></span><span style=display:flex><span>解释当前 observation            prior 接近 posterior
+</span></span><span style=display:flex><span>          │                             │
+</span></span><span style=display:flex><span>          └──────────────┬──────────────┘
+</span></span><span style=display:flex><span>                         ▼
+</span></span><span style=display:flex><span>             学到“可解释 + 可预测”的 latent world state
+</span></span></code></pre></div><hr><h2 id=27-如果继续往-planet--dreamer-看>27. 如果继续往 PlaNet / Dreamer 看<a hidden class=anchor aria-hidden=true href=#27-如果继续往-planet--dreamer-看>#</a></h2><p>到这里以后，再读经典方法会容易很多：</p><ul><li><strong>World Models</strong>：encoder → latent dynamics → controller</li><li><strong>PlaNet</strong>：把 latent dynamics 做成 RSSM，并在 latent space 规划</li><li><strong>Dreamer</strong>：不只在 latent 里规划，而是在 imagined latent rollout 中训练 actor/value</li></ul><p>之后的研究虽然表示形式、backbone、训练目标越来越复杂，但很多工作仍然围绕几个老问题：</p><ol><li>latent 里应该保留什么？</li><li>dynamics 应该如何建模？</li><li>reconstruction 是否必要？</li><li>prior / posterior 应该如何对齐？</li><li>world model 是服务某个 policy，还是做通用 simulator？</li><li>是否需要 pixel、token、BEV、occupancy、3DGS 等更显式的空间结构？</li></ol><hr><h2 id=28-最终压缩>28. 最终压缩<a hidden class=anchor aria-hidden=true href=#28-最终压缩>#</a></h2><p>如果只记一句：</p>$$
+\boxed{
+\text{World Model} =
+\text{State Representation}
++
+\text{Dynamics}
++
+\text{Decision Interface}
+}
+$$<p>如果只记它的训练逻辑：</p>$$
+\boxed{
+\text{没有 latent label}
+\Rightarrow
+\text{让 latent 同时“解释现在”并“可预测未来”}
+}
+$$<p>如果只记最经典的 sequential latent world model loss：</p>$$
+\boxed{
+L_t =
+L_{\text{reconstruction}}
++
+KL(
+q(z_t|z_{t-1},a_{t-1},o_t)
+\|
+p(z_t|z_{t-1},a_{t-1})
+)
+}
+$$<p>这三句话基本就是从 VAE 到经典 latent world model 的主干。</p></div><footer class=post-footer><ul class=post-tags></ul><nav class=paginav><a class=next href=https://letsgetai.github.io/posts/inductive-bias-time-series-scaling/><span class=title>下一页 »</span>
+<span>哪些归纳偏置活到了 scaling 时代：从时间序列预测十年复盘说起</span></a></nav><ul class=share-buttons><li><a target=_blank rel="noopener noreferrer" aria-label="share 从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版） on x" href="https://x.com/intent/tweet/?text=%e4%bb%8e%20VAE%20%e5%88%b0%e4%b8%96%e7%95%8c%e6%a8%a1%e5%9e%8b%ef%bc%9a%e4%bb%8e%e6%a6%82%e7%8e%87%e5%bb%ba%e6%a8%a1%e5%88%b0%20Sequential%20Latent%20World%20Model%ef%bc%88%e5%9b%be%e8%a7%a3%e7%89%88%ef%bc%89&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2fvae-to-world-model%2f&amp;hashtags="><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M512 62.554V449.446C512 483.97 483.97 512 449.446 512H62.554C28.03 512 0 483.97.0 449.446V62.554C0 28.03 28.029.0 62.554.0H449.446C483.971.0 512 28.03 512 62.554zM269.951 190.75 182.567 75.216H56L207.216 272.95 63.9 436.783h61.366L235.9 310.383l96.667 126.4H456L298.367 228.367l134-153.151H371.033zM127.633 110h36.468l219.38 290.065H349.5z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share 从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版） on linkedin" href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2fvae-to-world-model%2f&amp;title=%e4%bb%8e%20VAE%20%e5%88%b0%e4%b8%96%e7%95%8c%e6%a8%a1%e5%9e%8b%ef%bc%9a%e4%bb%8e%e6%a6%82%e7%8e%87%e5%bb%ba%e6%a8%a1%e5%88%b0%20Sequential%20Latent%20World%20Model%ef%bc%88%e5%9b%be%e8%a7%a3%e7%89%88%ef%bc%89&amp;summary=%e4%bb%8e%20VAE%20%e5%88%b0%e4%b8%96%e7%95%8c%e6%a8%a1%e5%9e%8b%ef%bc%9a%e4%bb%8e%e6%a6%82%e7%8e%87%e5%bb%ba%e6%a8%a1%e5%88%b0%20Sequential%20Latent%20World%20Model%ef%bc%88%e5%9b%be%e8%a7%a3%e7%89%88%ef%bc%89&amp;source=https%3a%2f%2fletsgetai.github.io%2fposts%2fvae-to-world-model%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zM160.461 423.278V197.561h-75.04v225.717h75.04zm270.539.0V293.839c0-69.333-37.018-101.586-86.381-101.586-39.804.0-57.634 21.891-67.617 37.266v-31.958h-75.021c.995 21.181.0 225.717.0 225.717h75.02V297.222c0-6.748.486-13.492 2.474-18.315 5.414-13.475 17.767-27.434 38.494-27.434 27.135.0 38.007 20.707 38.007 51.037v120.768H431zM123.448 88.722C97.774 88.722 81 105.601 81 127.724c0 21.658 16.264 39.002 41.455 39.002h.484c26.165.0 42.452-17.344 42.452-39.002-.485-22.092-16.241-38.954-41.943-39.002z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share 从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版） on reddit" href="https://reddit.com/submit?url=https%3a%2f%2fletsgetai.github.io%2fposts%2fvae-to-world-model%2f&title=%e4%bb%8e%20VAE%20%e5%88%b0%e4%b8%96%e7%95%8c%e6%a8%a1%e5%9e%8b%ef%bc%9a%e4%bb%8e%e6%a6%82%e7%8e%87%e5%bb%ba%e6%a8%a1%e5%88%b0%20Sequential%20Latent%20World%20Model%ef%bc%88%e5%9b%be%e8%a7%a3%e7%89%88%ef%bc%89"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zM446 265.638c0-22.964-18.616-41.58-41.58-41.58-11.211.0-21.361 4.457-28.841 11.666-28.424-20.508-67.586-33.757-111.204-35.278l18.941-89.121 61.884 13.157c.756 15.734 13.642 28.29 29.56 28.29 16.407.0 29.706-13.299 29.706-29.701.0-16.403-13.299-29.702-29.706-29.702-11.666.0-21.657 6.792-26.515 16.578l-69.105-14.69c-1.922-.418-3.939-.042-5.585 1.036-1.658 1.073-2.811 2.761-3.224 4.686l-21.152 99.438c-44.258 1.228-84.046 14.494-112.837 35.232-7.468-7.164-17.589-11.591-28.757-11.591-22.965.0-41.585 18.616-41.585 41.58.0 16.896 10.095 31.41 24.568 37.918-.639 4.135-.99 8.328-.99 12.576.0 63.977 74.469 115.836 166.33 115.836s166.334-51.859 166.334-115.836c0-4.218-.347-8.387-.977-12.493 14.564-6.47 24.735-21.034 24.735-38.001zM326.526 373.831c-20.27 20.241-59.115 21.816-70.534 21.816-11.428.0-50.277-1.575-70.522-21.82-3.007-3.008-3.007-7.882.0-10.889 3.003-2.999 7.882-3.003 10.885.0 12.777 12.781 40.11 17.317 59.637 17.317 19.522.0 46.86-4.536 59.657-17.321 3.016-2.999 7.886-2.995 10.885.008 3.008 3.011 3.003 7.882-.008 10.889zm-5.23-48.781c-16.373.0-29.701-13.324-29.701-29.698.0-16.381 13.328-29.714 29.701-29.714 16.378.0 29.706 13.333 29.706 29.714.0 16.374-13.328 29.698-29.706 29.698zM160.91 295.348c0-16.381 13.328-29.71 29.714-29.71 16.369.0 29.689 13.329 29.689 29.71.0 16.373-13.32 29.693-29.689 29.693-16.386.0-29.714-13.32-29.714-29.693z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share 从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版） on facebook" href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fletsgetai.github.io%2fposts%2fvae-to-world-model%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H342.978V319.085h66.6l12.672-82.621h-79.272v-53.617c0-22.603 11.073-44.636 46.58-44.636H425.6v-70.34s-32.71-5.582-63.982-5.582c-65.288.0-107.96 39.569-107.96 111.204v62.971h-72.573v82.621h72.573V512h-191.104c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share 从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版） on whatsapp" href="https://api.whatsapp.com/send?text=%e4%bb%8e%20VAE%20%e5%88%b0%e4%b8%96%e7%95%8c%e6%a8%a1%e5%9e%8b%ef%bc%9a%e4%bb%8e%e6%a6%82%e7%8e%87%e5%bb%ba%e6%a8%a1%e5%88%b0%20Sequential%20Latent%20World%20Model%ef%bc%88%e5%9b%be%e8%a7%a3%e7%89%88%ef%bc%89%20-%20https%3a%2f%2fletsgetai.github.io%2fposts%2fvae-to-world-model%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zm-58.673 127.703c-33.842-33.881-78.847-52.548-126.798-52.568-98.799.0-179.21 80.405-179.249 179.234-.013 31.593 8.241 62.428 23.927 89.612l-25.429 92.884 95.021-24.925c26.181 14.28 55.659 21.807 85.658 21.816h.074c98.789.0 179.206-80.413 179.247-179.243.018-47.895-18.61-92.93-52.451-126.81zM263.976 403.485h-.06c-26.734-.01-52.954-7.193-75.828-20.767l-5.441-3.229-56.386 14.792 15.05-54.977-3.542-5.637c-14.913-23.72-22.791-51.136-22.779-79.287.033-82.142 66.867-148.971 149.046-148.971 39.793.014 77.199 15.531 105.329 43.692 28.128 28.16 43.609 65.592 43.594 105.4-.034 82.149-66.866 148.983-148.983 148.984zm81.721-111.581c-4.479-2.242-26.499-13.075-30.604-14.571-4.105-1.495-7.091-2.241-10.077 2.241-2.986 4.483-11.569 14.572-14.182 17.562-2.612 2.988-5.225 3.364-9.703 1.12-4.479-2.241-18.91-6.97-36.017-22.23C231.8 264.15 222.81 249.484 220.198 245s-.279-6.908 1.963-9.14c2.016-2.007 4.48-5.232 6.719-7.847 2.24-2.615 2.986-4.484 4.479-7.472 1.493-2.99.747-5.604-.374-7.846-1.119-2.241-10.077-24.288-13.809-33.256-3.635-8.733-7.327-7.55-10.077-7.688-2.609-.13-5.598-.158-8.583-.158-2.986.0-7.839 1.121-11.944 5.604-4.105 4.484-15.675 15.32-15.675 37.364.0 22.046 16.048 43.342 18.287 46.332 2.24 2.99 31.582 48.227 76.511 67.627 10.685 4.615 19.028 7.371 25.533 9.434 10.728 3.41 20.492 2.929 28.209 1.775 8.605-1.285 26.499-10.833 30.231-21.295 3.732-10.464 3.732-19.431 2.612-21.298-1.119-1.869-4.105-2.99-8.583-5.232z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share 从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版） on telegram" href="https://telegram.me/share/url?text=%e4%bb%8e%20VAE%20%e5%88%b0%e4%b8%96%e7%95%8c%e6%a8%a1%e5%9e%8b%ef%bc%9a%e4%bb%8e%e6%a6%82%e7%8e%87%e5%bb%ba%e6%a8%a1%e5%88%b0%20Sequential%20Latent%20World%20Model%ef%bc%88%e5%9b%be%e8%a7%a3%e7%89%88%ef%bc%89&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2fvae-to-world-model%2f"><svg viewBox="2 2 28 28" height="30" width="30" fill="currentColor"><path d="M26.49 29.86H5.5a3.37 3.37.0 01-2.47-1 3.35 3.35.0 01-1-2.47V5.48A3.36 3.36.0 013 3 3.37 3.37.0 015.5 2h21A3.38 3.38.0 0129 3a3.36 3.36.0 011 2.46V26.37a3.35 3.35.0 01-1 2.47 3.38 3.38.0 01-2.51 1.02zm-5.38-6.71a.79.79.0 00.85-.66L24.73 9.24a.55.55.0 00-.18-.46.62.62.0 00-.41-.17q-.08.0-16.53 6.11a.59.59.0 00-.41.59.57.57.0 00.43.52l4 1.24 1.61 4.83a.62.62.0 00.63.43.56.56.0 00.4-.17L16.54 20l4.09 3A.9.9.0 0021.11 23.15zM13.8 20.71l-1.21-4q8.72-5.55 8.78-5.55c.15.0.23.0.23.16a.18.18.0 010 .06s-2.51 2.3-7.52 6.8z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share 从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版） on ycombinator" href="https://news.ycombinator.com/submitlink?t=%e4%bb%8e%20VAE%20%e5%88%b0%e4%b8%96%e7%95%8c%e6%a8%a1%e5%9e%8b%ef%bc%9a%e4%bb%8e%e6%a6%82%e7%8e%87%e5%bb%ba%e6%a8%a1%e5%88%b0%20Sequential%20Latent%20World%20Model%ef%bc%88%e5%9b%be%e8%a7%a3%e7%89%88%ef%bc%89&u=https%3a%2f%2fletsgetai.github.io%2fposts%2fvae-to-world-model%2f"><svg width="30" height="30" viewBox="0 0 512 512" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554V449.446C512 483.97 483.97 512 449.446 512H62.554C28.03 512 0 483.97.0 449.446V62.554C0 28.03 28.029.0 62.554.0H449.446zM183.8767 87.9921h-62.034L230.6673 292.4508V424.0079h50.6655V292.4508L390.1575 87.9921H328.1233L256 238.2489z"/></svg></a></li></ul></footer></article></main><footer class=footer><span>&copy; 2026 <a href=https://letsgetai.github.io/>The Herta</a></span> ·
+<span>Powered by
+<a href="https://gohugo.io/?utm_source=papermod" rel=noopener target=_blank>Hugo</a> &
+<a href=https://github.com/adityatelange/hugo-PaperMod/ rel=noopener target=_blank>PaperMod</a></span></footer><a href=#top id=top-link class="top-link hidden" aria-label="go to top" title="Go to Top (Alt + G)" accesskey=g><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevrons-up"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
+</a><script>let menu=document.getElementById("menu");if(menu){const e=localStorage.getItem("menu-scroll-position");e&&(menu.scrollLeft=parseInt(e,10)),menu.onscroll=function(){localStorage.setItem("menu-scroll-position",menu.scrollLeft)}}document.querySelectorAll('a[href^="#"]').forEach(e=>{e.addEventListener("click",function(e){e.preventDefault();var t=this.getAttribute("href").substr(1);window.matchMedia("(prefers-reduced-motion: reduce)").matches?document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView():document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView({behavior:"smooth"}),t==="top"?history.replaceState(null,null," "):history.pushState(null,null,`#${t}`)})})</script><script>var toplink=document.getElementById("top-link");window.onscroll=function(){const e=window.innerHeight;document.body.scrollTop>e||document.documentElement.scrollTop>e?toplink.classList.remove("hidden"):toplink.classList.add("hidden")}</script><script>document.getElementById("theme-toggle").addEventListener("click",()=>{const e=document.querySelector("html");e.dataset.theme==="dark"?(e.dataset.theme="light",localStorage.setItem("pref-theme","light")):(e.dataset.theme="dark",localStorage.setItem("pref-theme","dark"))})</script><script>document.querySelectorAll("pre > code").forEach(e=>{const n=e.parentNode.parentNode,t=document.createElement("button");t.classList.add("copy-code"),t.innerHTML="复制";function s(){t.innerHTML="已复制！",setTimeout(()=>{t.innerHTML="复制"},2e3)}t.addEventListener("click",t=>{if("clipboard"in navigator){navigator.clipboard.writeText(e.textContent),s();return}const n=document.createRange();n.selectNodeContents(e);const o=window.getSelection();o.removeAllRanges(),o.addRange(n);try{document.execCommand("copy"),s()}catch{}o.removeRange(n)}),n.classList.contains("highlight")?n.appendChild(t):n.parentNode.firstChild==n||(e.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName=="TABLE"?e.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(t):e.parentNode.appendChild(t))})</script></body></html>
