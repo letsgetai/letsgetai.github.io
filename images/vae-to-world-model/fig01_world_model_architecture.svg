@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="540" viewBox="0 0 1200 540">
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="570" viewBox="0 0 1200 570">
 <style>
   .title { font: 700 28px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
   .label { font: 600 20px -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif; fill:#17202A; }
@@ -8,50 +8,54 @@
   .box2 { fill:#EEF4F8; stroke:#526D82; stroke-width:2.2; rx:14; }
   .accent { fill:#F3F7FA; stroke:#2F5D7C; stroke-width:2.5; rx:14; }
   .arrow { stroke:#526D82; stroke-width:2.5; fill:none; marker-end:url(#arrow); }
-  .dash { stroke:#7D8D9C; stroke-width:2.2; fill:none; stroke-dasharray:8 7; marker-end:url(#arrow2); }
 </style>
 <defs>
  <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
    <path d="M0,0 L0,6 L9,3 z" fill="#526D82"/>
  </marker>
- <marker id="arrow2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth">
-   <path d="M0,0 L0,6 L9,3 z" fill="#7D8D9C"/>
- </marker>
 </defs>
 <rect width="100%" height="100%" fill="white"/>
 
 <text x="60" y="52" class="title">图 1｜世界模型的最小结构：表示、动力学与决策</text>
-<rect x="70" y="150" width="210" height="100" class="box"/>
-<text x="175" y="188" text-anchor="middle" class="label">观测 o_t</text>
-<text x="175" y="220" text-anchor="middle" class="small">RGB / Depth / Proprio.</text>
 
-<rect x="360" y="135" width="240" height="130" class="accent"/>
-<text x="480" y="180" text-anchor="middle" class="label">Representation</text>
-<text x="480" y="215" text-anchor="middle" class="math">o_t → z_t</text>
-<text x="480" y="242" text-anchor="middle" class="small">学习内部世界状态</text>
+<!-- 主链路：观测 o_t → Representation → Dynamics → z_{t+1} -->
+<rect x="60" y="155" width="230" height="100" class="box"/>
+<text x="175" y="193" text-anchor="middle" class="label">观测 o_t</text>
+<text x="175" y="225" text-anchor="middle" class="small">RGB / Depth / Proprio.</text>
 
-<rect x="690" y="120" width="270" height="160" class="accent"/>
-<text x="825" y="165" text-anchor="middle" class="label">Dynamics</text>
-<text x="825" y="202" text-anchor="middle" class="math">(z_t, a_t) → z_{t+1}</text>
-<text x="825" y="235" text-anchor="middle" class="small">预测动作作用后的世界变化</text>
+<rect x="360" y="130" width="240" height="150" class="accent"/>
+<text x="480" y="178" text-anchor="middle" class="label">Representation</text>
+<text x="480" y="213" text-anchor="middle" class="math">o_t → z_t</text>
+<text x="480" y="244" text-anchor="middle" class="small">学习内部世界状态</text>
 
-<rect x="690" y="350" width="270" height="110" class="box2"/>
-<text x="825" y="392" text-anchor="middle" class="label">Decision Interface</text>
-<text x="825" y="427" text-anchor="middle" class="math">z_t → a_t</text>
+<rect x="680" y="115" width="250" height="180" class="accent"/>
+<text x="805" y="165" text-anchor="middle" class="label">Dynamics</text>
+<text x="805" y="203" text-anchor="middle" class="math">(z_t, a_t) → z_{t+1}</text>
+<text x="805" y="236" text-anchor="middle" class="small">预测动作作用后的世界变化</text>
 
-<rect x="1020" y="150" width="120" height="100" class="box"/>
-<text x="1080" y="190" text-anchor="middle" class="label">z_{t+1}</text>
-<text x="1080" y="220" text-anchor="middle" class="small">下一状态</text>
+<rect x="1000" y="155" width="150" height="100" class="box"/>
+<text x="1075" y="195" text-anchor="middle" class="label">z_{t+1}</text>
+<text x="1075" y="227" text-anchor="middle" class="small">下一状态</text>
 
-<path d="M280 200 L360 200" class="arrow"/>
-<path d="M600 200 L690 200" class="arrow"/>
-<path d="M960 200 L1020 200" class="arrow"/>
-<path d="M825 280 L825 350" class="arrow"/>
+<path d="M290 205 L360 205" class="arrow"/>
+<path d="M600 205 L680 205" class="arrow"/>
+<path d="M930 205 L1000 205" class="arrow"/>
 
-<rect x="620" y="40" width="170" height="70" class="box"/>
-<text x="705" y="83" text-anchor="middle" class="label">动作 a_t</text>
-<path d="M705 110 C720 130,755 145,780 150" class="arrow"/>
-<path d="M790 110 C820 170,825 290,825 350" class="dash"/>
-<text x="610" y="500" class="small">核心问题：学到的 z_t 既要压缩当前观测，又要足以支持未来预测与决策。</text>
+<!-- 决策接口：由 z_t 产生动作 -->
+<rect x="360" y="350" width="260" height="110" class="box2"/>
+<text x="490" y="395" text-anchor="middle" class="label">Decision Interface</text>
+<text x="490" y="430" text-anchor="middle" class="math">z_t → a_t</text>
+
+<path d="M480 280 L480 350" class="arrow"/>
+<text x="494" y="322" class="small">z_t</text>
+
+<rect x="715" y="365" width="180" height="80" class="box"/>
+<text x="805" y="412" text-anchor="middle" class="label">动作 a_t</text>
+
+<path d="M620 405 L715 405" class="arrow"/>
+<text x="667" y="392" text-anchor="middle" class="small">a_t</text>
+<path d="M805 365 L805 295" class="arrow"/>
+
+<text x="60" y="533" class="small">核心问题：学到的 z_t 既要压缩当前观测，又要足以支持未来预测与决策。</text>
 
 </svg>
