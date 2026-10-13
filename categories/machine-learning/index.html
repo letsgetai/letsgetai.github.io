@@ -4,7 +4,19 @@
 <svg fill="none" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" height="12" width="12"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a></li></ul></nav></header><main class=main><header class=page-header><nav class=breadcrumbs role=navigation aria-label=Breadcrumb><a href=/>主页</a>
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"/></svg>
 <a href=/categories/>Categories</a>
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"/></svg></nav><h1>Machine Learning</h1></header><article class="post-entry tag-entry"><header class=entry-header><h2 class=entry-hint-parent>从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）</h2></header><div class=entry-content><p>目标：用一条连续的逻辑链，把“世界模型是什么、为什么需要 latent state、为什么会出现 posterior、ELBO 从哪里来、世界模型的 loss 为什么长成 reconstruction + dynamics KL”讲清楚。
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"/></svg></nav><h1>Machine Learning</h1></header><article class="post-entry tag-entry"><header class=entry-header><h2 class=entry-hint-parent>World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录</h2></header><div class=entry-content><p>世界应该被表示成什么？ 未来到底应该预测什么？ 预测未来以后，怎么把它变成决策？ 一个模型需要多像真实世界，才足够支持 planning / control？ 0. 最开始：我对 World Model 的朴素理解 最开始其实可以把 World Model 写得非常简单：
+$$ \text{observation} \rightarrow \text{state representation} \rightarrow \text{dynamics} \rightarrow \text{decision} $$如果是真实状态完全可见的 MDP，我们会写：
+$$ p(s_{t+1}\mid s_t,a_t) $$然后 policy 根据当前状态做决策：
+$$ \pi(a_t\mid s_t) $$但真实机器人、视觉控制等问题里，我们通常只能看到 observation：
+$$ o_t $$并不知道真正的环境状态 $s_t$。于是一个自然的问题是：
+能不能从观测中学出一个内部状态 $z_t$，再在这个内部状态上学习世界如何变化？
+于是最基本的形式变成：
+$$ o_t\rightarrow z_t $$$$ (z_t,a_t)\rightarrow z_{t+1} $$$$ z_t\rightarrow a_t $$现在回头看，后面的很多论文其实都是在修改这三个箭头。
+1. World Models（2018）：先学一个可以“做梦”的世界 论文：David Ha, Jürgen Schmidhuber, World Models, 2018
+这是最适合拿来当起点的一篇。
+它把整个系统拆成三个非常直观的模块：
+$$ \boxed{ \text{VAE} + \text{MDN-RNN} + \text{Controller} } $$也就是论文里常说的：
+...</p></div><footer class=entry-footer><span title='2026-10-13 00:00:00 +0000 UTC'>2026-10-13</span>&nbsp;·&nbsp;<span>10 分钟</span>&nbsp;·&nbsp;<span>2021 字</span>&nbsp;·&nbsp;<span>LetsGetAI</span></footer><a class=entry-link aria-label="post link to World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录" href=https://letsgetai.github.io/posts/world-model-problem-evolution/></a></article><article class="post-entry tag-entry"><header class=entry-header><h2 class=entry-hint-parent>从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）</h2></header><div class=entry-content><p>目标：用一条连续的逻辑链，把“世界模型是什么、为什么需要 latent state、为什么会出现 posterior、ELBO 从哪里来、世界模型的 loss 为什么长成 reconstruction + dynamics KL”讲清楚。
 这不是论文综述，而是一份偏“推导 + 直觉”的入门笔记。
 1. 世界模型到底是什么 最核心的直觉是：
 世界模型学习一个内部世界状态，并预测这个世界在动作作用下如何变化。

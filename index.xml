@@ -1,4 +1,57 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>The Herta</title><link>https://letsgetai.github.io/</link><description>Recent content on The Herta</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sun, 27 Sep 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://letsgetai.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）</title><link>https://letsgetai.github.io/posts/vae-to-world-model/</link><pubDate>Sun, 27 Sep 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/vae-to-world-model/</guid><description>&lt;blockquote&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>The Herta</title><link>https://letsgetai.github.io/</link><description>Recent content on The Herta</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Tue, 13 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://letsgetai.github.io/index.xml" rel="self" type="application/rss+xml"/><item><title>World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录</title><link>https://letsgetai.github.io/posts/world-model-problem-evolution/</link><pubDate>Tue, 13 Oct 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/world-model-problem-evolution/</guid><description>&lt;blockquote&gt;
+&lt;ol&gt;
+&lt;li&gt;世界应该被表示成什么？&lt;/li&gt;
+&lt;li&gt;未来到底应该预测什么？&lt;/li&gt;
+&lt;li&gt;预测未来以后，怎么把它变成决策？&lt;/li&gt;
+&lt;li&gt;一个模型需要多像真实世界，才足够支持 planning / control？&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id="0-最开始我对-world-model-的朴素理解"&gt;0. 最开始：我对 World Model 的朴素理解&lt;/h2&gt;
+&lt;p&gt;最开始其实可以把 World Model 写得非常简单：&lt;/p&gt;
+$$
+\text{observation}
+\rightarrow
+\text{state representation}
+\rightarrow
+\text{dynamics}
+\rightarrow
+\text{decision}
+$$&lt;p&gt;如果是真实状态完全可见的 MDP，我们会写：&lt;/p&gt;
+$$
+p(s_{t+1}\mid s_t,a_t)
+$$&lt;p&gt;然后 policy 根据当前状态做决策：&lt;/p&gt;
+$$
+\pi(a_t\mid s_t)
+$$&lt;p&gt;但真实机器人、视觉控制等问题里，我们通常只能看到 observation：&lt;/p&gt;
+$$
+o_t
+$$&lt;p&gt;并不知道真正的环境状态 $s_t$。于是一个自然的问题是：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;能不能从观测中学出一个内部状态 $z_t$，再在这个内部状态上学习世界如何变化？&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;于是最基本的形式变成：&lt;/p&gt;
+$$
+o_t\rightarrow z_t
+$$$$
+(z_t,a_t)\rightarrow z_{t+1}
+$$$$
+z_t\rightarrow a_t
+$$&lt;p&gt;现在回头看，后面的很多论文其实都是在修改这三个箭头。&lt;/p&gt;
+&lt;hr&gt;
+&lt;h2 id="1-world-models2018先学一个可以做梦的世界"&gt;1. World Models（2018）：先学一个可以“做梦”的世界&lt;/h2&gt;
+&lt;p&gt;&lt;strong&gt;论文：David Ha, Jürgen Schmidhuber, &lt;em&gt;World Models&lt;/em&gt;, 2018&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;这是最适合拿来当起点的一篇。&lt;/p&gt;
+&lt;p&gt;它把整个系统拆成三个非常直观的模块：&lt;/p&gt;
+$$
+\boxed{
+\text{VAE}
++
+\text{MDN-RNN}
++
+\text{Controller}
+}
+$$&lt;p&gt;也就是论文里常说的：&lt;/p&gt;</description></item><item><title>从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）</title><link>https://letsgetai.github.io/posts/vae-to-world-model/</link><pubDate>Sun, 27 Sep 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/vae-to-world-model/</guid><description>&lt;blockquote&gt;
 &lt;p&gt;目标：用一条连续的逻辑链，把“世界模型是什么、为什么需要 latent state、为什么会出现 posterior、ELBO 从哪里来、世界模型的 loss 为什么长成 reconstruction + dynamics KL”讲清楚。&lt;br&gt;
 这不是论文综述，而是一份偏“推导 + 直觉”的入门笔记。&lt;/p&gt;
 &lt;/blockquote&gt;

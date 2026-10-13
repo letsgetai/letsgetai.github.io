@@ -1,0 +1,635 @@
+<!doctype html><html lang=en dir=auto data-theme=auto><head><meta charset=utf-8><meta http-equiv=X-UA-Compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,shrink-to-fit=no"><meta name=robots content="index, follow"><title>World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录 | The Herta</title><meta name=keywords content><meta name=description content="
+
+世界应该被表示成什么？
+未来到底应该预测什么？
+预测未来以后，怎么把它变成决策？
+一个模型需要多像真实世界，才足够支持 planning / control？
+
+
+
+0. 最开始：我对 World Model 的朴素理解
+最开始其实可以把 World Model 写得非常简单：
+$$
+\text{observation}
+\rightarrow
+\text{state representation}
+\rightarrow
+\text{dynamics}
+\rightarrow
+\text{decision}
+$$如果是真实状态完全可见的 MDP，我们会写：
+$$
+p(s_{t+1}\mid s_t,a_t)
+$$然后 policy 根据当前状态做决策：
+$$
+\pi(a_t\mid s_t)
+$$但真实机器人、视觉控制等问题里，我们通常只能看到 observation：
+$$
+o_t
+$$并不知道真正的环境状态 $s_t$。于是一个自然的问题是：
+
+能不能从观测中学出一个内部状态 $z_t$，再在这个内部状态上学习世界如何变化？
+
+于是最基本的形式变成：
+$$
+o_t\rightarrow z_t
+$$$$
+(z_t,a_t)\rightarrow z_{t+1}
+$$$$
+z_t\rightarrow a_t
+$$现在回头看，后面的很多论文其实都是在修改这三个箭头。
+
+1. World Models（2018）：先学一个可以“做梦”的世界
+论文：David Ha, Jürgen Schmidhuber, World Models, 2018
+这是最适合拿来当起点的一篇。
+它把整个系统拆成三个非常直观的模块：
+$$
+\boxed{
+\text{VAE}
++
+\text{MDN-RNN}
++
+\text{Controller}
+}
+$$也就是论文里常说的："><meta name=author content="LetsGetAI"><link rel=canonical href=https://letsgetai.github.io/posts/world-model-problem-evolution/><link crossorigin=anonymous href=/assets/css/stylesheet.4a7a0536a1692fc4d59bd621cb1b40f180c2fea7796bab2d32e27cfc03deb1b9.css integrity="sha256-SnoFNqFpL8TVm9YhyxtA8YDC/qd5a6stMuJ8/APesbk=" rel="preload stylesheet" as=style><link rel=icon href=https://letsgetai.github.io/favicon.ico><link rel=icon type=image/png sizes=16x16 href=https://letsgetai.github.io/favicon-16x16.png><link rel=icon type=image/png sizes=32x32 href=https://letsgetai.github.io/favicon-32x32.png><link rel=apple-touch-icon href=https://letsgetai.github.io/apple-touch-icon.png><link rel=mask-icon href=https://letsgetai.github.io/safari-pinned-tab.svg><meta name=theme-color content="#2e2e33"><meta name=msapplication-TileColor content="#2e2e33"><link rel=alternate hreflang=en href=https://letsgetai.github.io/posts/world-model-problem-evolution/><noscript><style>#theme-toggle,.top-link{display:none}</style><style>@media(prefers-color-scheme:dark){:root{--theme:rgb(29, 30, 32);--entry:rgb(46, 46, 51);--primary:rgb(218, 218, 219);--secondary:rgb(155, 156, 157);--tertiary:rgb(65, 66, 68);--content:rgb(196, 196, 197);--code-block-bg:rgb(46, 46, 51);--code-bg:rgb(55, 56, 62);--border:rgb(51, 51, 51);color-scheme:dark}.list{background:var(--theme)}.toc{background:var(--entry)}}</style></noscript><script>localStorage.getItem("pref-theme")==="dark"?document.querySelector("html").dataset.theme="dark":localStorage.getItem("pref-theme")==="light"?document.querySelector("html").dataset.theme="light":window.matchMedia("(prefers-color-scheme: dark)").matches?document.querySelector("html").dataset.theme="dark":document.querySelector("html").dataset.theme="light"</script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css><script defer src=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js></script><script defer src=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js onload='renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:!0},{left:"$",right:"$",display:!1}]})'></script><script src=https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js></script><script>mermaid.initialize({startOnLoad:!0,theme:"default",flowchart:{useMaxWidth:!0}})</script><meta property="og:url" content="https://letsgetai.github.io/posts/world-model-problem-evolution/"><meta property="og:site_name" content="The Herta"><meta property="og:title" content="World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录"><meta property="og:description" content="世界应该被表示成什么？ 未来到底应该预测什么？ 预测未来以后，怎么把它变成决策？ 一个模型需要多像真实世界，才足够支持 planning / control？ 0. 最开始：我对 World Model 的朴素理解 最开始其实可以把 World Model 写得非常简单：
+$$ \text{observation} \rightarrow \text{state representation} \rightarrow \text{dynamics} \rightarrow \text{decision} $$如果是真实状态完全可见的 MDP，我们会写：
+$$ p(s_{t+1}\mid s_t,a_t) $$然后 policy 根据当前状态做决策：
+$$ \pi(a_t\mid s_t) $$但真实机器人、视觉控制等问题里，我们通常只能看到 observation：
+$$ o_t $$并不知道真正的环境状态 $s_t$。于是一个自然的问题是：
+能不能从观测中学出一个内部状态 $z_t$，再在这个内部状态上学习世界如何变化？
+于是最基本的形式变成：
+$$ o_t\rightarrow z_t $$$$ (z_t,a_t)\rightarrow z_{t+1} $$$$ z_t\rightarrow a_t $$现在回头看，后面的很多论文其实都是在修改这三个箭头。
+1. World Models（2018）：先学一个可以“做梦”的世界 论文：David Ha, Jürgen Schmidhuber, World Models, 2018
+这是最适合拿来当起点的一篇。
+它把整个系统拆成三个非常直观的模块：
+$$ \boxed{ \text{VAE} + \text{MDN-RNN} + \text{Controller} } $$也就是论文里常说的："><meta property="og:locale" content="zh_cn"><meta property="og:type" content="article"><meta property="article:section" content="posts"><meta property="article:published_time" content="2026-10-13T00:00:00+00:00"><meta property="article:modified_time" content="2026-10-13T00:00:00+00:00"><meta name=twitter:card content="summary"><meta name=twitter:title content="World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录"><meta name=twitter:description content="世界应该被表示成什么？ 未来到底应该预测什么？ 预测未来以后，怎么把它变成决策？ 一个模型需要多像真实世界，才足够支持 planning / control？ 0. 最开始：我对 World Model 的朴素理解 最开始其实可以把 World Model 写得非常简单：
+$$ \text{observation} \rightarrow \text{state representation} \rightarrow \text{dynamics} \rightarrow \text{decision} $$如果是真实状态完全可见的 MDP，我们会写：
+$$ p(s_{t+1}\mid s_t,a_t) $$然后 policy 根据当前状态做决策：
+$$ \pi(a_t\mid s_t) $$但真实机器人、视觉控制等问题里，我们通常只能看到 observation：
+$$ o_t $$并不知道真正的环境状态 $s_t$。于是一个自然的问题是：
+能不能从观测中学出一个内部状态 $z_t$，再在这个内部状态上学习世界如何变化？
+于是最基本的形式变成：
+$$ o_t\rightarrow z_t $$$$ (z_t,a_t)\rightarrow z_{t+1} $$$$ z_t\rightarrow a_t $$现在回头看，后面的很多论文其实都是在修改这三个箭头。
+1. World Models（2018）：先学一个可以“做梦”的世界 论文：David Ha, Jürgen Schmidhuber, World Models, 2018
+这是最适合拿来当起点的一篇。
+它把整个系统拆成三个非常直观的模块：
+$$ \boxed{ \text{VAE} + \text{MDN-RNN} + \text{Controller} } $$也就是论文里常说的："><script type=application/ld+json>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Posts","item":"https://letsgetai.github.io/posts/"},{"@type":"ListItem","position":2,"name":"World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录","item":"https://letsgetai.github.io/posts/world-model-problem-evolution/"}]}</script><script type=application/ld+json>{"@context":"https://schema.org","@type":"BlogPosting","headline":"World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录","name":"World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录","description":" 世界应该被表示成什么？ 未来到底应该预测什么？ 预测未来以后，怎么把它变成决策？ 一个模型需要多像真实世界，才足够支持 planning / control？ 0. 最开始：我对 World Model 的朴素理解 最开始其实可以把 World Model 写得非常简单：\n$$ \\text{observation} \\rightarrow \\text{state representation} \\rightarrow \\text{dynamics} \\rightarrow \\text{decision} $$如果是真实状态完全可见的 MDP，我们会写：\n$$ p(s_{t+1}\\mid s_t,a_t) $$然后 policy 根据当前状态做决策：\n$$ \\pi(a_t\\mid s_t) $$但真实机器人、视觉控制等问题里，我们通常只能看到 observation：\n$$ o_t $$并不知道真正的环境状态 $s_t$。于是一个自然的问题是：\n能不能从观测中学出一个内部状态 $z_t$，再在这个内部状态上学习世界如何变化？\n于是最基本的形式变成：\n$$ o_t\\rightarrow z_t $$$$ (z_t,a_t)\\rightarrow z_{t+1} $$$$ z_t\\rightarrow a_t $$现在回头看，后面的很多论文其实都是在修改这三个箭头。\n1. World Models（2018）：先学一个可以“做梦”的世界 论文：David Ha, Jürgen Schmidhuber, World Models, 2018\n这是最适合拿来当起点的一篇。\n它把整个系统拆成三个非常直观的模块：\n$$ \\boxed{ \\text{VAE} + \\text{MDN-RNN} + \\text{Controller} } $$也就是论文里常说的：\n","keywords":[],"articleBody":" 世界应该被表示成什么？ 未来到底应该预测什么？ 预测未来以后，怎么把它变成决策？ 一个模型需要多像真实世界，才足够支持 planning / control？ 0. 最开始：我对 World Model 的朴素理解 最开始其实可以把 World Model 写得非常简单：\n$$ \\text{observation} \\rightarrow \\text{state representation} \\rightarrow \\text{dynamics} \\rightarrow \\text{decision} $$如果是真实状态完全可见的 MDP，我们会写：\n$$ p(s_{t+1}\\mid s_t,a_t) $$然后 policy 根据当前状态做决策：\n$$ \\pi(a_t\\mid s_t) $$但真实机器人、视觉控制等问题里，我们通常只能看到 observation：\n$$ o_t $$并不知道真正的环境状态 $s_t$。于是一个自然的问题是：\n能不能从观测中学出一个内部状态 $z_t$，再在这个内部状态上学习世界如何变化？\n于是最基本的形式变成：\n$$ o_t\\rightarrow z_t $$$$ (z_t,a_t)\\rightarrow z_{t+1} $$$$ z_t\\rightarrow a_t $$现在回头看，后面的很多论文其实都是在修改这三个箭头。\n1. World Models（2018）：先学一个可以“做梦”的世界 论文：David Ha, Jürgen Schmidhuber, World Models, 2018\n这是最适合拿来当起点的一篇。\n它把整个系统拆成三个非常直观的模块：\n$$ \\boxed{ \\text{VAE} + \\text{MDN-RNN} + \\text{Controller} } $$也就是论文里常说的：\n$$ V + M + C $$1.1 VAE：先把视觉世界压缩掉 原始 observation 是图像：\n$$ o_t $$VAE 把它压成一个低维 latent：\n$$ o_t\\xrightarrow{\\text{VAE}}z_t $$这个 $z_t$ 负责描述“当前画面大概是什么状态”。\n这里很容易产生一个误解：\n$z_t$ 并没有人工标签。VAE 是先在环境采集到的图像上自己训练的，然后后续 dynamics 使用这个已经学好的 latent coordinate system。\n所以数据流更像：\n$$ o_t\\rightarrow z_t $$$$ o_{t+1}\\rightarrow z_{t+1} $$然后 dynamics 得到：\n$$ (z_t,a_t,z_{t+1}) $$这样的训练样本。\n1.2 MDN-RNN：世界接下来会怎么变？ 世界的动态由 MDN-RNN 学：\n$$ p(z_{t+1}\\mid z_t,a_t,h_t) $$其中 $h_t$ 是 RNN 的 hidden state，用来记住单帧看不到的历史信息，例如速度、运动趋势等。\n为什么不是直接输出一个：\n$$ \\hat z_{t+1} $$而是输出一个 mixture distribution？\n因为未来可能有不确定性，因此用 mixture density network 表达：\n$$ p(z_{t+1}\\mid z_t,a_t,h_t) \\sum_k\\pi_k \\mathcal N(z_{t+1};\\mu_k,\\sigma_k^2) $$\n于是这篇论文第一次非常直观地把一个想法摆出来：\n$$ \\boxed{ \\text{世界模型不是记住现在，而是能够产生未来} } $$1.3 Controller：在学出来的世界里行动 Controller 反而很简单：\n$$ (z_t,h_t)\\rightarrow a_t $$如果 VAE 和 dynamics 已经给出了足够好的内部世界，那么 policy 本身不一定需要很复杂。\n最有意思的实验思想是：\n可以让 agent 在 MDN-RNN 产生的“dream”里训练，再把 controller 放回真实环境执行。\n论文真正留下来的概念，并不是某个具体 VAE 或 RNN 结构，而是：\n$$ \\boxed{ \\text{learn a world} \\rightarrow \\text{act inside the learned world} } $$1.4 当时留下的第一个疑问 这里很快会发现：\nVAE 学 $z_t$ 的目标只是 reconstruction。\n一个“适合重建当前图像”的 latent，真的也是一个“适合预测未来和控制”的 latent 吗？\n而且 World Models 的训练基本是：\n$$ \\text{先学 VAE} \\rightarrow \\text{固定 latent space} \\rightarrow \\text{再学 dynamics} $$representation 和 dynamics 并没有真正一起塑造 latent。\n这个问题自然引出了 PlaNet。\n2. PlaNet（2019）：representation 和 dynamics 为什么要分开学？ 论文：Danijar Hafner et al., Learning Latent Dynamics for Planning from Pixels, ICML 2019\nPlaNet 的变化并不是简单“换一个更好的 RNN”。\n它真正做的是：\n$$ \\boxed{ \\text{把 representation learning 和 dynamics learning 联合起来} } $$核心结构是 RSSM（Recurrent State-Space Model）。\n2.1 RSSM：确定性记忆 + 随机状态 PlaNet 的 latent state 不再只是一个 $z_t$，而是可以理解为两部分：\n$$ (h_t,z_t) $$其中：\n$h_t$：deterministic recurrent state，负责保留历史记忆； $z_t$：stochastic latent state，负责表示当前状态中的不确定性。 状态首先根据过去和动作推进：\n$$ h_t=f(h_{t-1},z_{t-1},a_{t-1}) $$然后在没有看到当前 observation 之前，world model 有一个 predictive prior：\n$$ p(z_t\\mid h_t) $$真正看到 $o_t$ 后，再通过 posterior 修正：\n$$ q(z_t\\mid h_t,o_t) $$这其实就是一个非常自然的：\n$$ \\boxed{ \\text{predict} \\rightarrow \\text{observe} \\rightarrow \\text{correct} } $$过程。\n2.2 为什么 prior / posterior 这么关键？ 训练的时候，真实 $o_t$ 已经存在，所以 posterior 可以利用它：\n$$ q(z_t\\mid h_t,o_t) $$但如果现在要想象未来：\n$$ t+1,t+2,\\ldots $$未来的 observation 根本还不存在。\n所以 rollout 时只能依靠：\n$$ p(z_{t+1}\\mid h_{t+1}) $$这解释了为什么 PlaNet / Dreamer 里 prior 和 posterior 的一致性那么重要。\n训练目标可以粗略理解成两部分：\n$$ \\mathcal L \\underbrace{-\\log p(o_t\\mid h_t,z_t)}{\\text{解释当前观测}} + \\underbrace{ KL\\left( q(z_t\\mid h_t,o_t) \\Vert p(z_t\\mid h_t) \\right) }{\\text{让预测状态接近观测修正后的状态}} $$\n于是一个好的 latent state 同时需要：\n$$ \\boxed{ \\text{observable} + \\text{predictable} } $$这和 World Models 的“先 VAE、再 dynamics”已经是不同的思想。\n2.3 PlaNet 还特别关心多步预测 如果模型只学好：\n$$ z_t\\rightarrow z_{t+1} $$并不能保证：\n$$ z_t \\rightarrow z_{t+1} \\rightarrow z_{t+2} \\rightarrow\\cdots $$长期 rollout 仍然准确。\nPlaNet 为此提出了 latent overshooting：\n除了要求一步 transition 对，还额外让从更早状态多步 rollout 后的预测，与未来 observation 推断出的 posterior 保持一致。\n这个细节很重要，因为它已经暴露了 world model 中一个一直延续到今天的问题：\n$$ \\boxed{ \\text{one-step accuracy} \\neq \\text{long-horizon consistency} } $$PlaNet 的论文结论也明确强调：一个用于 planning 的 dynamics model，需要能够较准确地预测未来多步 reward；RSSM 和 multi-step variational objective 都是围绕这个目标设计的。\n3. PlaNet 的第二个推进：预测未来以后，怎么做决策？ 这里我们一开始容易把两件事混在一起：\n$$ \\text{预测未来} $$和：\n$$ \\text{规划} $$其实并不是一回事。\n如果给定一串动作：\n$$ a_{t:t+H} $$world model 可以 rollout：\n$$ s_t \\rightarrow s_{t+1} \\rightarrow \\cdots \\rightarrow s_{t+H} $$这是 prediction / simulation。\n但 planning 还需要：\n$$ \\boxed{ \\text{generate candidates} \\rightarrow \\text{predict consequences} \\rightarrow \\text{evaluate} \\rightarrow \\text{select} } $$PlaNet 使用 CEM（Cross-Entropy Method）在 latent space 搜索 action sequence。\n粗略地说：\n$$ a_{t:t+H}^{(1)}, a_{t:t+H}^{(2)}, \\ldots $$每条动作序列都通过 world model rollout，并预测未来 reward：\n$$ \\hat r_t,\\hat r_{t+1},\\ldots $$再寻找：\n$$ a^*_{t:t+H} \\arg\\max \\sum_{\\tau=t}^{t+H}\\hat r_\\tau $$\n然后只执行第一个动作，再得到真实的新 observation，重新推断 state、重新 planning。\n这就是 MPC / receding horizon 的味道：\n$$ \\boxed{ \\text{plan} \\rightarrow \\text{execute one step} \\rightarrow \\text{observe} \\rightarrow \\text{replan} } $$这里我们第一次比较明确地区分了：\n$$ \\boxed{ \\text{World Model} \\neq \\text{Planner} } $$world model 回答：\n如果这样做，会发生什么？\nplanner 回答：\n那么我现在应该做什么？\n4. Dreamer（2020）：为什么每一步都要重新搜？ 论文：Danijar Hafner et al., Dream to Control: Learning Behaviors by Latent Imagination, ICLR 2020\nPlaNet 有一个很明显的计算模式：\n$$ \\text{每来到一个 state} \\rightarrow \\text{现场搜索很多 action sequences} $$也就是说，很多计算发生在 decision time。\nDreamer 的问题非常自然：\nworld model 已经能产生 imagined trajectories，为什么不直接在这些 trajectory 上把 policy 学出来？\n于是决策方式从：\n$$ \\arg\\max_{a_{t:t+H}} $$逐渐变成：\n$$ a_t\\sim\\pi_\\psi(a_t\\mid s_t) $$ 4.1 在 imagination 里训练 actor / value Dreamer 基本保留了 RSSM world model。\n从一个真实数据推断出的 latent state 出发：\n$$ s_t=(h_t,z_t) $$actor 给动作：\n$$ a_t\\sim\\pi_\\psi(a_t\\mid s_t) $$world model 产生 imagined next state：\n$$ s_t,a_t \\rightarrow \\hat s_{t+1} $$同时 reward model 给出：\n$$ \\hat r_t $$然后继续：\n$$ \\hat s_{t+1} \\rightarrow a_{t+1} \\rightarrow \\hat s_{t+2} \\rightarrow\\cdots $$于是得到了 imagined trajectory。\nactor 学习最大化 imagined return，value network 学习估计长期 return。\nDreamer 的一个关键技术点，是利用 learned differentiable dynamics，让 value / reward 的梯度沿 imagined trajectory 反向传播来改进行为。\n4.2 PlaNet → Dreamer：搜索和“内化搜索” 我们当时觉得一个很自然的类比是：\n$$ \\boxed{ \\text{PlaNet : Dreamer} \\approx \\text{search / BoN : learned policy / RL} } $$当然这不是严格算法等价。\nPlaNet 更像：\n$$ \\text{每次现场生成候选} \\rightarrow \\text{比较} \\rightarrow \\text{选一个} $$Dreamer 则把大量 imagined experience 逐渐吸收到 actor 参数里：\n$$ \\boxed{ \\text{online search} \\rightarrow \\text{amortized decision} } $$于是执行时只需要：\n$$ s_t\\rightarrow\\pi(a_t\\mid s_t) $$这也是为什么 Dreamer 相比 PlaNet 更接近一个可以直接部署的 policy。\n4.3 “一条真实轨迹为什么能反复用”？ 这里我们也有过一个疑问。\n真实环境里只有：\n$$ (o_t,a_t,r_t,o_{t+1}) $$这些数据。\n那 world model 凭什么从一个真实 state 出发，去尝试数据里没出现过的动作？\n答案是：\n它并没有获得新的真实 label。\nworld model 只是根据已经从真实数据学到的 dynamics，给出 synthetic prediction：\n$$ (s_t,a_t') \\rightarrow (\\hat s_{t+1},\\hat r_t) $$同一个真实 state 可以被反复当作 imagination 的起点，并在不同版本的 actor 下展开不同的未来。\n所以 model-based RL 的“数据杠杆”不是凭空创造真实信息，而是：\n$$ \\boxed{ \\text{少量昂贵 real interaction} \\rightarrow \\text{learn model} \\rightarrow \\text{大量便宜 synthetic policy updates} } $$但这也直接带来风险：\n$$ \\boxed{ \\text{model bias} } $$如果：\n$$ \\hat s_{t+1}\\neq s_{t+1}^{real} $$甚至模型错误会被 policy 主动利用，就会出现 model exploitation。\n所以 imagination 从来不是“免费真数据”。\n5. MuZero（2020）：World Model 一定要还原世界吗？ 论文：Julian Schrittwieser et al., Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model, Nature 2020\n看到 PlaNet / Dreamer 后，一个更根本的问题出现了：\n为什么 world model 一定要能把 observation 重建出来？\nMuZero 的回答非常激进：\n$$ \\boxed{ \\text{不需要} } $$ 5.1 只学习 planning 真正需要的东西 MuZero 学三类模型：\nRepresentation $$ h(o_{1:t})\\rightarrow s_t $$Dynamics $$ g(s_t,a_t)\\rightarrow(s_{t+1},r_t) $$Prediction $$ f(s_t)\\rightarrow(\\pi_t,v_t) $$它并不要求：\n$$ s_t\\rightarrow o_t $$也就是说，latent state 不需要还原 pixel，也不需要对应一个人类可解释的物理状态。\n它只需要能够支持：\n$$ \\boxed{ \\text{reward} + \\text{value} + \\text{policy} } $$预测和 MCTS planning。\nNature 论文对 MuZero 的概括非常直接：\n模型学习的是 predictions relevant to planning，包括 policy、value 和 reward，而不是完整复原环境 dynamics。\n5.2 AlphaZero → MuZero 这个区别也很清楚。\nAlphaZero 做 tree search，但棋类规则本身是已知的：\n$$ (s_t,a_t)\\rightarrow s_{t+1} $$环境 simulator 是现成的。\nMuZero 则把 simulator 本身也学出来：\n$$ \\boxed{ \\text{AlphaZero} \\text{known dynamics} + \\text{search} } $$\n$$ \\boxed{ \\text{MuZero} \\text{learned latent dynamics} + \\text{search} } $$\n所以 MuZero 给 world model 留下了一个很重要的认识：\n$$ \\boxed{ \\text{good world model} \\neq \\text{perfect reconstruction of the world} } $$更准确地说，对于 planning：\n$$ \\boxed{ \\text{decision-sufficient} } $$可能比：\n$$ \\text{observation-complete} $$更重要。\n这条思想后面会重新出现在 JEPA / feature prediction 等路线里，只是训练目标不同。\n6. 到这里为止：我们主要看的其实只是 Dec / Seq / GLV 后来借助 embodied world model survey，才发现前面这条经典线在整个现代 taxonomy 里其实只是一个象限：\n$$ \\boxed{ \\text{Decision-Coupled} + \\text{Sequential} + \\text{Global Latent Vector} } $$PlaNet、Dreamer 系列都属于这一支。\n这里的默认假设大概是：\n$$ \\text{世界} \\rightarrow \\text{一个 compact latent state} $$然后：\n$$ s_t\\rightarrow s_{t+1} $$按时间一步一步 rollout，并直接服务 planning / control。\n接下来我们开始逐一问：\n这些假设真的必须成立吗？\n7. IRIS / TFS：世界一定要压成一个 latent vector 吗？ 代表论文：Vincent Micheli, Eloi Alonso, François Fleuret, Transformers are Sample-Efficient World Models (IRIS), ICLR 2023\nDreamer-style GLV 的思维还是：\n$$ o_t\\rightarrow z_t\\in\\mathbb R^d $$也就是整个世界被压缩成一个全局状态。\nToken Feature Sequence（TFS）则变成：\n$$ o_t \\rightarrow X_t=[x_t^1,x_t^2,\\ldots,x_t^N] $$世界不再只是一个 vector，而是一组 token / feature。\n7.1 IRIS：把环境变成一种 sequence modeling 问题 IRIS 使用：\n$$ \\boxed{ \\text{discrete autoencoder} + \\text{autoregressive Transformer} } $$先把 observation 编成离散 visual tokens，然后 Transformer 建模 token 和 action 的时序关系。\n于是 world dynamics 越来越像：\n$$ p(X_{t+1}\\mid X_{\\leq t},a_{\\leq t}) $$而不是传统 RSSM 的：\n$$ p(z_{t+1}\\mid z_t,a_t) $$论文在 Atari 100k 上强调的重点就是 sample-efficient world-model learning：通过 learned world model 中的 imagined experience 来训练 agent，同时让 Transformer 承担环境序列建模。\n7.2 representation philosophy 发生了变化 这不是简单：\nRNN 换成 Transformer。\n更重要的是：\n$$ \\boxed{ \\text{world = one compact state} } $$开始变成：\n$$ \\boxed{ \\text{world = structured collection of tokens} } $$这样 vision、language、proprioception、action 等不同 modality 都更容易进入同一个 sequence framework：\n$$ [ \\text{vision tokens}, \\text{language tokens}, \\text{action tokens}, \\text{proprio tokens} ] $$于是这条路线很自然会继续走向：\n$$ \\boxed{ \\text{World Model} + \\text{VLA} \\rightarrow \\text{World-Action Model} } $$这里 world prediction 和 action prediction 的边界开始变得没有过去那么清楚。\n8. OccWorld / SLG：token 够不够？空间结构要不要显式保留？ 论文：Wenzhao Zheng et al., OccWorld: Learning a 3D Occupancy World Model for Autonomous Driving, ECCV 2024\n继续往 embodied / robot 方向走，会碰到另一个问题：\n如果机器人真正关心的是位置、距离、碰撞和可达性，仅仅把世界表示成 token 是否太隐式了？\n于是 Spatial Latent Grid（SLG）把空间结构直接放进 representation。\n8.1 世界直接表示成 occupancy 可以粗略写成：\n$$ O_t(x,y,z) $$描述三维空间中不同位置：\n是否被占据； 是什么语义； 哪些区域是 free space。 相比 bounding box，occupancy 能保存更细粒度的 3D scene structure。\nOccWorld 先学习一个 reconstruction-based scene tokenizer，把 3D occupancy 压成离散 scene tokens，再使用 GPT-like spatial-temporal generative Transformer 同时预测：\n$$ \\text{future scene tokens} $$和：\n$$ \\text{future ego tokens} $$最后 decode 成：\n$$ \\hat O_{t+1:t+H} $$以及 ego trajectory。\n所以它很有意思：\n$$ \\boxed{ \\text{representation 是 spatial} \\quad \\text{但 dynamics 内部又可以 token 化} } $$taxonomy 并不是互斥的网络结构标签，而是在描述模型最终保留了什么世界结构。\n8.2 为什么这对 planning 很自然？ 如果 future state 本身就是 occupancy：\n$$ O_{t+1:t+H} $$那么规划器很容易直接评价：\n这条 trajectory 会不会穿过未来被占据的位置？\n因此 world representation 和 downstream cost 的接口非常直接：\n$$ \\boxed{ \\text{future occupancy} \\rightarrow \\text{trajectory evaluation} } $$OccWorld 的实验也显示，它不仅能做 3D scene forecasting，还能在不使用 instance 和 map supervision 的条件下得到有竞争力的 planning 结果。\n这里的 inductive bias 很明确：\n$$ \\boxed{ \\text{真实世界具有需要显式保留的空间拓扑} } $$代价则是更高的计算和存储成本。\n9. JEPA / V-JEPA：为什么一定要预测 pixel？ 走到这里，又出现一个和 MuZero 有点相似、但来源不同的问题：\n如果我们真正关心的是稳定、抽象、可预测的规律，为什么要让模型预测所有 pixel？\n例如：\n树叶具体怎么晃； 微小光照变化； 纹理细节； sensor noise。 这些东西很难预测，但未必是理解世界和做决策最重要的部分。\nJEPA 的回答是：\n$$ \\boxed{ \\text{不要预测 pixel，预测 representation} } $$ 9.1 JEPA 的基本结构 最核心的三部分是：\n$$ \\text{context encoder} + \\text{target encoder} + \\text{predictor} $$context encoder 看到可见区域：\n$$ x_c\\rightarrow z_c $$target encoder 为被遮住的真实区域产生表示：\n$$ x_{\\text{target}}\\rightarrow z_{\\text{target}} $$predictor 只根据 context representation 去预测：\n$$ \\hat z_{\\text{target}} P(z_c,\\text{target position}) $$\n训练目标是：\n$$ \\hat z_{\\text{target}} \\approx z_{\\text{target}} $$而不是：\n$$ \\hat x_{\\text{target}} \\approx x_{\\text{target}} $$V-JEPA 把这一思想放到视频中，通过 masked spatiotemporal feature prediction 学习 motion 和 appearance representation。论文特别强调：它只使用 feature prediction objective，不依赖 pixel reconstruction、text supervision 或 negative examples。\n9.2 它和 MuZero像在哪里，又不一样在哪里？ 两者都在反对：\n$$ \\boxed{ \\text{world model 必须完整复刻 observation} } $$但它们的 inductive bias 不一样。\nMuZero 用：\n$$ \\text{reward / value / policy} $$来定义“什么信息值得保留”。\n所以它非常 task-coupled。\nJEPA 则使用：\n$$ \\text{representation predictability} $$来定义值得学习的结构，希望先得到更 general-purpose 的 representation。\n因此可以粗略理解：\n$$ \\boxed{ \\text{MuZero：对决策 sufficient} } $$$$ \\boxed{ \\text{JEPA：对世界的可预测结构 sufficient} } $$这也是为什么后者更容易被放到 general-purpose world model 这一侧。\n10. 回头看：这些论文其实不是在争同一个 architecture 如果只按模型名字看，很容易把历史理解成：\n$$ \\text{RNN} \\rightarrow \\text{Transformer} \\rightarrow \\text{Diffusion} $$但我们一路看下来，更像是在不断修改四个问题。\n10.1 State 应该是什么？ 最开始：\n$$ \\boxed{ \\text{global latent vector} } $$World Models / PlaNet / Dreamer 都基本属于这种思路。\n然后：\n$$ \\boxed{ \\text{token feature sequence} } $$世界变成可以组合、交互的一组 token。\n再到：\n$$ \\boxed{ \\text{spatial / 3D representation} } $$显式保存几何和 topology。\n所以这里的演进不是“表示越来越大”这么简单，而是：\n$$ \\text{我愿意给模型什么结构先验？} $$GLV 假设一个 compact state 足够；\nTFS 强调 compositional / relational structure；\nSLG 则进一步认为 geometry 本身应该被显式编码。\n10.2 Future 应该预测什么？ 最早很自然会想到：\n$$ \\text{未来 observation / pixel} $$然后变成：\n$$ \\text{future latent state} $$MuZero 又进一步说：\n$$ \\text{只预测 planning relevant quantities} $$JEPA 则说：\n$$ \\text{预测 abstract representation} $$于是出现一个我觉得很重要的变化：\n$$ \\boxed{ \\text{“把未来复制出来”} \\rightarrow \\text{“把未来真正有用的结构预测出来”} } $$但“有用”到底如何定义，不同路线的答案并不一样。\n10.3 时间应该怎么建模？ World Models / PlaNet / Dreamer 都有很强的 sequential flavor：\n$$ s_t \\rightarrow s_{t+1} \\rightarrow s_{t+2} \\rightarrow\\cdots $$它的问题很明显：\n$$ \\text{error accumulation} $$以及：\n$$ \\text{long-horizon consistency} $$后来 Transformer/token world model 把 temporal modeling 重新写成 sequence modeling。\n再往现代 generative / global prediction 的方向走，又会出现：\n$$ \\boxed{ \\text{不一定逐步 autoregressive rollout， 而是直接预测更长 future block} } $$我们目前只建立了这个分支的概念，还没有深入 diffusion / DiT 细节。\n10.4 Prediction 最后怎么变成 Decision？ 这里的路线也非常有意思。\nWorld Models $$ \\text{world model} \\rightarrow \\text{controller} $$PlaNet $$ \\text{world model} \\rightarrow \\text{CEM online planning} $$Dreamer $$ \\text{world model} \\rightarrow \\text{imagined actor/value learning} $$MuZero $$ \\text{learned latent model} \\rightarrow \\text{MCTS} $$再往 World-Action Model / VLA 方向走：\n$$ \\text{world prediction} + \\text{action prediction} $$可能逐渐进入同一个 model。\n于是我们反复碰到一个很通用的 trade-off：\n$$ \\boxed{ \\text{inference-time search} \\leftrightarrow \\text{amortized policy} } $$PlaNet 把很多计算留到现场；\nDreamer 把更多计算放进训练并沉淀到 policy；\nMuZero 又保留了强 search；\n现代 VLA / world-action model 则可能进一步把 planning pattern 吸进大规模 sequence model。\n11. 暂时形成的理解：World Model 不等于“未来视频生成器” 最开始很容易把 world model 理解成：\n给过去几帧，生成未来几帧。\n但一路看下来，这个定义明显太窄。\n现在我更愿意把它写成：\n$$ \\boxed{ \\text{学习一个能够表达环境状态，并支持关于未来进行推演的内部模型} } $$关键不在于这个内部模型是不是：\npixel； token； vector； occupancy； 3D field。 真正的问题是：\n$$ \\boxed{ \\text{它有没有保留进行未来预测和决策所需要的结构？} } $$这也解释了为什么不同 world model 看起来差异越来越大：\nDreamer 的 world 很小，是 compact latent； MuZero 的 world 甚至不用还原 observation； OccWorld 的 world 很几何，是 occupancy； JEPA 的 world 更像一个抽象 feature space。 它们并不是在逼近同一个“唯一正确的世界表示”。\n12. 一个暂时没有答案的问题：什么才是 sufficient representation？ 现在回头看，这可能是整条线里最核心的问题：\n$$ \\boxed{ \\text{什么信息对未来预测和控制是 sufficient 的？} } $$太弱的 representation：\n$$ \\Rightarrow \\text{预测不了真正重要的 dynamics} $$太强、太完整的 representation：\n$$ \\Rightarrow \\text{大量容量浪费在不可预测或与任务无关的细节} $$所以不同路线其实在不同地方押注：\n$$ \\text{Dreamer} \\rightarrow \\text{compact predictive latent} $$$$ \\text{MuZero} \\rightarrow \\text{decision-relevant latent} $$$$ \\text{TFS} \\rightarrow \\text{compositional token state} $$$$ \\text{OccWorld} \\rightarrow \\text{geometry-aware spatial state} $$$$ \\text{JEPA} \\rightarrow \\text{predictable abstract representation} $$到这里，我不太想直接下结论说其中哪一个更“正确”。\n更合理的问题是：\n对于具体的 downstream problem，哪些信息必须显式保存，哪些可以压掉？\n13. 目前这段阅读可以压成一条问题演进线 最后不按年份，而按我们遇到问题的顺序记：\n$$ \\boxed{\\text{World Models}} $$ 能不能先学一个世界，再在里面行动？\n$$ \\downarrow $$$$ \\boxed{\\text{PlaNet}} $$ representation 和 dynamics 为什么要分开学？\n能不能直接在 latent world 里 planning？\n$$ \\downarrow $$$$ \\boxed{\\text{Dreamer}} $$ 每次都在线搜索是不是太贵？\n能不能把 imagined experience 内化进 policy？\n$$ \\downarrow $$$$ \\boxed{\\text{MuZero}} $$ world model 一定要还原真实 observation 吗？\n$$ \\downarrow $$$$ \\boxed{\\text{IRIS / TFS}} $$ 世界一定要压成一个 global latent vector 吗？\n$$ \\downarrow $$$$ \\boxed{\\text{OccWorld / SLG}} $$ embodied system 所需要的 geometry 是否应该显式保留？\n$$ \\downarrow $$$$ \\boxed{\\text{JEPA / V-JEPA}} $$ 为什么还要预测所有 pixel？\n能不能只预测抽象、稳定、可预测的 representation？\n然后问题又回到了最开始：\n$$ \\boxed{ \\text{到底什么才是一个“足够好的内部世界”？} } $$现在的暂时答案不是某种具体 architecture，而更像：\n$$ \\boxed{ \\text{一个好的 World Model， 应该保留对未来推演和下游决策真正 sufficient 的结构。} } $$问题在于，什么叫 sufficient，取决于我们最终到底想让 agent 做什么。\n参考论文 Ha, D., \u0026 Schmidhuber, J. World Models. 2018. Hafner, D., et al. Learning Latent Dynamics for Planning from Pixels (PlaNet). ICML 2019. Hafner, D., et al. Dream to Control: Learning Behaviors by Latent Imagination (Dreamer). ICLR 2020. Schrittwieser, J., et al. Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model (MuZero). Nature, 2020. Micheli, V., Alonso, E., \u0026 Fleuret, F. Transformers are Sample-Efficient World Models (IRIS). ICLR 2023. Zheng, W., et al. OccWorld: Learning a 3D Occupancy World Model for Autonomous Driving. ECCV 2024. Bardes, A., et al. Revisiting Feature Prediction for Learning Visual Representations from Video (V-JEPA). 2024. A Comprehensive Survey on World Models for Embodied AI. 用于本文中 Dec/Seq/GLV、TFS、SLG、General-Purpose 等 taxonomy 的定位。 ","wordCount":"2021","inLanguage":"en","datePublished":"2026-10-13T00:00:00Z","dateModified":"2026-10-13T00:00:00Z","author":{"@type":"Person","name":"LetsGetAI"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://letsgetai.github.io/posts/world-model-problem-evolution/"},"publisher":{"@type":"Organization","name":"The Herta","logo":{"@type":"ImageObject","url":"https://letsgetai.github.io/favicon.ico"}}}</script></head><body id=top><header class=header><nav class=header-nav><div class=logo><a href=https://letsgetai.github.io/ accesskey=h title="The Herta (Alt + H)">The Herta</a><div class=logo-switches><button id=theme-toggle class=theme-toggle accesskey=t title="(Alt + T)" aria-label="Toggle theme">
+<svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+<svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button></div></div><ul id=menu class=menu><li><a href=https://letsgetai.github.io/ title=首页><span>首页</span></a></li><li><a href=https://letsgetai.github.io/archives/ title=归档><span>归档</span></a></li><li><a href=https://letsgetai.github.io/about/ title=关于><span>关于</span></a></li><li><a href=https://letsgetai.github.io/categories/ title=分类><span>分类</span></a></li><li><a href=https://github.com/letsgetai title=GitHub><span>GitHub</span>&nbsp;
+<svg fill="none" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" height="12" width="12"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a></li></ul></nav></header><main class=main><article class=post-single><header class=post-header><nav class=breadcrumbs role=navigation aria-label=Breadcrumb><a href=/>主页</a>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"/></svg>
+<a href=/posts/>Posts</a>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"/></svg></nav><h1 class="post-title entry-hint-parent">World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录</h1><div class=post-meta><span title='2026-10-13 00:00:00 +0000 UTC'>2026-10-13</span>&nbsp;·&nbsp;<span>10 分钟</span>&nbsp;·&nbsp;<span>2021 字</span>&nbsp;·&nbsp;<span>LetsGetAI</span></div></header><div class="post-content md-content"><blockquote><ol><li>世界应该被表示成什么？</li><li>未来到底应该预测什么？</li><li>预测未来以后，怎么把它变成决策？</li><li>一个模型需要多像真实世界，才足够支持 planning / control？</li></ol></blockquote><hr><h2 id=0-最开始我对-world-model-的朴素理解>0. 最开始：我对 World Model 的朴素理解<a hidden class=anchor aria-hidden=true href=#0-最开始我对-world-model-的朴素理解>#</a></h2><p>最开始其实可以把 World Model 写得非常简单：</p>$$
+\text{observation}
+\rightarrow
+\text{state representation}
+\rightarrow
+\text{dynamics}
+\rightarrow
+\text{decision}
+$$<p>如果是真实状态完全可见的 MDP，我们会写：</p>$$
+p(s_{t+1}\mid s_t,a_t)
+$$<p>然后 policy 根据当前状态做决策：</p>$$
+\pi(a_t\mid s_t)
+$$<p>但真实机器人、视觉控制等问题里，我们通常只能看到 observation：</p>$$
+o_t
+$$<p>并不知道真正的环境状态 $s_t$。于是一个自然的问题是：</p><blockquote><p>能不能从观测中学出一个内部状态 $z_t$，再在这个内部状态上学习世界如何变化？</p></blockquote><p>于是最基本的形式变成：</p>$$
+o_t\rightarrow z_t
+$$$$
+(z_t,a_t)\rightarrow z_{t+1}
+$$$$
+z_t\rightarrow a_t
+$$<p>现在回头看，后面的很多论文其实都是在修改这三个箭头。</p><hr><h2 id=1-world-models2018先学一个可以做梦的世界>1. World Models（2018）：先学一个可以“做梦”的世界<a hidden class=anchor aria-hidden=true href=#1-world-models2018先学一个可以做梦的世界>#</a></h2><p><strong>论文：David Ha, Jürgen Schmidhuber, <em>World Models</em>, 2018</strong></p><p>这是最适合拿来当起点的一篇。</p><p>它把整个系统拆成三个非常直观的模块：</p>$$
+\boxed{
+\text{VAE}
++
+\text{MDN-RNN}
++
+\text{Controller}
+}
+$$<p>也就是论文里常说的：</p>$$
+V + M + C
+$$<h3 id=11-vae先把视觉世界压缩掉>1.1 VAE：先把视觉世界压缩掉<a hidden class=anchor aria-hidden=true href=#11-vae先把视觉世界压缩掉>#</a></h3><p>原始 observation 是图像：</p>$$
+o_t
+$$<p>VAE 把它压成一个低维 latent：</p>$$
+o_t\xrightarrow{\text{VAE}}z_t
+$$<p>这个 $z_t$ 负责描述“当前画面大概是什么状态”。</p><p>这里很容易产生一个误解：<br>$z_t$ 并没有人工标签。VAE 是先在环境采集到的图像上自己训练的，然后后续 dynamics 使用这个已经学好的 latent coordinate system。</p><p>所以数据流更像：</p>$$
+o_t\rightarrow z_t
+$$$$
+o_{t+1}\rightarrow z_{t+1}
+$$<p>然后 dynamics 得到：</p>$$
+(z_t,a_t,z_{t+1})
+$$<p>这样的训练样本。</p><h3 id=12-mdn-rnn世界接下来会怎么变>1.2 MDN-RNN：世界接下来会怎么变？<a hidden class=anchor aria-hidden=true href=#12-mdn-rnn世界接下来会怎么变>#</a></h3><p>世界的动态由 MDN-RNN 学：</p>$$
+p(z_{t+1}\mid z_t,a_t,h_t)
+$$<p>其中 $h_t$ 是 RNN 的 hidden state，用来记住单帧看不到的历史信息，例如速度、运动趋势等。</p><p>为什么不是直接输出一个：</p>$$
+\hat z_{t+1}
+$$<p>而是输出一个 mixture distribution？</p><p>因为未来可能有不确定性，因此用 mixture density network 表达：</p><h1 id=pz_t1mid-z_ta_th_t>$$
+p(z_{t+1}\mid z_t,a_t,h_t)</h1><p>\sum_k\pi_k
+\mathcal N(z_{t+1};\mu_k,\sigma_k^2)
+$$</p><p>于是这篇论文第一次非常直观地把一个想法摆出来：</p>$$
+\boxed{
+\text{世界模型不是记住现在，而是能够产生未来}
+}
+$$<h3 id=13-controller在学出来的世界里行动>1.3 Controller：在学出来的世界里行动<a hidden class=anchor aria-hidden=true href=#13-controller在学出来的世界里行动>#</a></h3><p>Controller 反而很简单：</p>$$
+(z_t,h_t)\rightarrow a_t
+$$<p>如果 VAE 和 dynamics 已经给出了足够好的内部世界，那么 policy 本身不一定需要很复杂。</p><p>最有意思的实验思想是：<br>可以让 agent 在 MDN-RNN 产生的“dream”里训练，再把 controller 放回真实环境执行。</p><p>论文真正留下来的概念，并不是某个具体 VAE 或 RNN 结构，而是：</p>$$
+\boxed{
+\text{learn a world}
+\rightarrow
+\text{act inside the learned world}
+}
+$$<h3 id=14-当时留下的第一个疑问>1.4 当时留下的第一个疑问<a hidden class=anchor aria-hidden=true href=#14-当时留下的第一个疑问>#</a></h3><p>这里很快会发现：</p><blockquote><p>VAE 学 $z_t$ 的目标只是 reconstruction。<br>一个“适合重建当前图像”的 latent，真的也是一个“适合预测未来和控制”的 latent 吗？</p></blockquote><p>而且 World Models 的训练基本是：</p>$$
+\text{先学 VAE}
+\rightarrow
+\text{固定 latent space}
+\rightarrow
+\text{再学 dynamics}
+$$<p>representation 和 dynamics 并没有真正一起塑造 latent。</p><p>这个问题自然引出了 PlaNet。</p><hr><h2 id=2-planet2019representation-和-dynamics-为什么要分开学>2. PlaNet（2019）：representation 和 dynamics 为什么要分开学？<a hidden class=anchor aria-hidden=true href=#2-planet2019representation-和-dynamics-为什么要分开学>#</a></h2><p><strong>论文：Danijar Hafner et al., <em>Learning Latent Dynamics for Planning from Pixels</em>, ICML 2019</strong></p><p>PlaNet 的变化并不是简单“换一个更好的 RNN”。</p><p>它真正做的是：</p>$$
+\boxed{
+\text{把 representation learning 和 dynamics learning 联合起来}
+}
+$$<p>核心结构是 RSSM（Recurrent State-Space Model）。</p><hr><h3 id=21-rssm确定性记忆--随机状态>2.1 RSSM：确定性记忆 + 随机状态<a hidden class=anchor aria-hidden=true href=#21-rssm确定性记忆--随机状态>#</a></h3><p>PlaNet 的 latent state 不再只是一个 $z_t$，而是可以理解为两部分：</p>$$
+(h_t,z_t)
+$$<p>其中：</p><ul><li>$h_t$：deterministic recurrent state，负责保留历史记忆；</li><li>$z_t$：stochastic latent state，负责表示当前状态中的不确定性。</li></ul><p>状态首先根据过去和动作推进：</p>$$
+h_t=f(h_{t-1},z_{t-1},a_{t-1})
+$$<p>然后在没有看到当前 observation 之前，world model 有一个 predictive prior：</p>$$
+p(z_t\mid h_t)
+$$<p>真正看到 $o_t$ 后，再通过 posterior 修正：</p>$$
+q(z_t\mid h_t,o_t)
+$$<p>这其实就是一个非常自然的：</p>$$
+\boxed{
+\text{predict}
+\rightarrow
+\text{observe}
+\rightarrow
+\text{correct}
+}
+$$<p>过程。</p><hr><h3 id=22-为什么-prior--posterior-这么关键>2.2 为什么 prior / posterior 这么关键？<a hidden class=anchor aria-hidden=true href=#22-为什么-prior--posterior-这么关键>#</a></h3><p>训练的时候，真实 $o_t$ 已经存在，所以 posterior 可以利用它：</p>$$
+q(z_t\mid h_t,o_t)
+$$<p>但如果现在要想象未来：</p>$$
+t+1,t+2,\ldots
+$$<p>未来的 observation 根本还不存在。</p><p>所以 rollout 时只能依靠：</p>$$
+p(z_{t+1}\mid h_{t+1})
+$$<p>这解释了为什么 PlaNet / Dreamer 里 prior 和 posterior 的一致性那么重要。</p><p>训练目标可以粗略理解成两部分：</p><h1 id=mathcal-l>$$
+\mathcal L</h1><p>\underbrace{-\log p(o_t\mid h_t,z_t)}<em>{\text{解释当前观测}}
++
+\underbrace{
+KL\left(
+q(z_t\mid h_t,o_t)
+\Vert
+p(z_t\mid h_t)
+\right)
+}</em>{\text{让预测状态接近观测修正后的状态}}
+$$</p><p>于是一个好的 latent state 同时需要：</p>$$
+\boxed{
+\text{observable}
++
+\text{predictable}
+}
+$$<p>这和 World Models 的“先 VAE、再 dynamics”已经是不同的思想。</p><hr><h3 id=23-planet-还特别关心多步预测>2.3 PlaNet 还特别关心多步预测<a hidden class=anchor aria-hidden=true href=#23-planet-还特别关心多步预测>#</a></h3><p>如果模型只学好：</p>$$
+z_t\rightarrow z_{t+1}
+$$<p>并不能保证：</p>$$
+z_t
+\rightarrow z_{t+1}
+\rightarrow z_{t+2}
+\rightarrow\cdots
+$$<p>长期 rollout 仍然准确。</p><p>PlaNet 为此提出了 <strong>latent overshooting</strong>：<br>除了要求一步 transition 对，还额外让从更早状态多步 rollout 后的预测，与未来 observation 推断出的 posterior 保持一致。</p><p>这个细节很重要，因为它已经暴露了 world model 中一个一直延续到今天的问题：</p>$$
+\boxed{
+\text{one-step accuracy}
+\neq
+\text{long-horizon consistency}
+}
+$$<p>PlaNet 的论文结论也明确强调：一个用于 planning 的 dynamics model，需要能够较准确地预测未来多步 reward；RSSM 和 multi-step variational objective 都是围绕这个目标设计的。</p><hr><h2 id=3-planet-的第二个推进预测未来以后怎么做决策>3. PlaNet 的第二个推进：预测未来以后，怎么做决策？<a hidden class=anchor aria-hidden=true href=#3-planet-的第二个推进预测未来以后怎么做决策>#</a></h2><p>这里我们一开始容易把两件事混在一起：</p>$$
+\text{预测未来}
+$$<p>和：</p>$$
+\text{规划}
+$$<p>其实并不是一回事。</p><p>如果给定一串动作：</p>$$
+a_{t:t+H}
+$$<p>world model 可以 rollout：</p>$$
+s_t
+\rightarrow
+s_{t+1}
+\rightarrow
+\cdots
+\rightarrow
+s_{t+H}
+$$<p>这是 <strong>prediction / simulation</strong>。</p><p>但 planning 还需要：</p>$$
+\boxed{
+\text{generate candidates}
+\rightarrow
+\text{predict consequences}
+\rightarrow
+\text{evaluate}
+\rightarrow
+\text{select}
+}
+$$<p>PlaNet 使用 CEM（Cross-Entropy Method）在 latent space 搜索 action sequence。</p><p>粗略地说：</p>$$
+a_{t:t+H}^{(1)},
+a_{t:t+H}^{(2)},
+\ldots
+$$<p>每条动作序列都通过 world model rollout，并预测未来 reward：</p>$$
+\hat r_t,\hat r_{t+1},\ldots
+$$<p>再寻找：</p><h1 id=a_tth>$$
+a^*_{t:t+H}</h1><p>\arg\max
+\sum_{\tau=t}^{t+H}\hat r_\tau
+$$</p><p>然后只执行第一个动作，再得到真实的新 observation，重新推断 state、重新 planning。</p><p>这就是 MPC / receding horizon 的味道：</p>$$
+\boxed{
+\text{plan}
+\rightarrow
+\text{execute one step}
+\rightarrow
+\text{observe}
+\rightarrow
+\text{replan}
+}
+$$<p>这里我们第一次比较明确地区分了：</p>$$
+\boxed{
+\text{World Model}
+\neq
+\text{Planner}
+}
+$$<p>world model 回答：</p><blockquote><p>如果这样做，会发生什么？</p></blockquote><p>planner 回答：</p><blockquote><p>那么我现在应该做什么？</p></blockquote><hr><h2 id=4-dreamer2020为什么每一步都要重新搜>4. Dreamer（2020）：为什么每一步都要重新搜？<a hidden class=anchor aria-hidden=true href=#4-dreamer2020为什么每一步都要重新搜>#</a></h2><p><strong>论文：Danijar Hafner et al., <em>Dream to Control: Learning Behaviors by Latent Imagination</em>, ICLR 2020</strong></p><p>PlaNet 有一个很明显的计算模式：</p>$$
+\text{每来到一个 state}
+\rightarrow
+\text{现场搜索很多 action sequences}
+$$<p>也就是说，很多计算发生在 decision time。</p><p>Dreamer 的问题非常自然：</p><blockquote><p>world model 已经能产生 imagined trajectories，为什么不直接在这些 trajectory 上把 policy 学出来？</p></blockquote><p>于是决策方式从：</p>$$
+\arg\max_{a_{t:t+H}}
+$$<p>逐渐变成：</p>$$
+a_t\sim\pi_\psi(a_t\mid s_t)
+$$<hr><h3 id=41-在-imagination-里训练-actor--value>4.1 在 imagination 里训练 actor / value<a hidden class=anchor aria-hidden=true href=#41-在-imagination-里训练-actor--value>#</a></h3><p>Dreamer 基本保留了 RSSM world model。</p><p>从一个真实数据推断出的 latent state 出发：</p>$$
+s_t=(h_t,z_t)
+$$<p>actor 给动作：</p>$$
+a_t\sim\pi_\psi(a_t\mid s_t)
+$$<p>world model 产生 imagined next state：</p>$$
+s_t,a_t
+\rightarrow
+\hat s_{t+1}
+$$<p>同时 reward model 给出：</p>$$
+\hat r_t
+$$<p>然后继续：</p>$$
+\hat s_{t+1}
+\rightarrow
+a_{t+1}
+\rightarrow
+\hat s_{t+2}
+\rightarrow\cdots
+$$<p>于是得到了 imagined trajectory。</p><p>actor 学习最大化 imagined return，value network 学习估计长期 return。</p><p>Dreamer 的一个关键技术点，是利用 learned differentiable dynamics，让 value / reward 的梯度沿 imagined trajectory 反向传播来改进行为。</p><hr><h3 id=42-planet--dreamer搜索和内化搜索>4.2 PlaNet → Dreamer：搜索和“内化搜索”<a hidden class=anchor aria-hidden=true href=#42-planet--dreamer搜索和内化搜索>#</a></h3><p>我们当时觉得一个很自然的类比是：</p>$$
+\boxed{
+\text{PlaNet : Dreamer}
+\approx
+\text{search / BoN : learned policy / RL}
+}
+$$<p>当然这不是严格算法等价。</p><p>PlaNet 更像：</p>$$
+\text{每次现场生成候选}
+\rightarrow
+\text{比较}
+\rightarrow
+\text{选一个}
+$$<p>Dreamer 则把大量 imagined experience 逐渐吸收到 actor 参数里：</p>$$
+\boxed{
+\text{online search}
+\rightarrow
+\text{amortized decision}
+}
+$$<p>于是执行时只需要：</p>$$
+s_t\rightarrow\pi(a_t\mid s_t)
+$$<p>这也是为什么 Dreamer 相比 PlaNet 更接近一个可以直接部署的 policy。</p><hr><h3 id=43-一条真实轨迹为什么能反复用>4.3 “一条真实轨迹为什么能反复用”？<a hidden class=anchor aria-hidden=true href=#43-一条真实轨迹为什么能反复用>#</a></h3><p>这里我们也有过一个疑问。</p><p>真实环境里只有：</p>$$
+(o_t,a_t,r_t,o_{t+1})
+$$<p>这些数据。</p><p>那 world model 凭什么从一个真实 state 出发，去尝试数据里没出现过的动作？</p><p>答案是：<br>它并没有获得新的真实 label。</p><p>world model 只是根据已经从真实数据学到的 dynamics，给出 synthetic prediction：</p>$$
+(s_t,a_t')
+\rightarrow
+(\hat s_{t+1},\hat r_t)
+$$<p>同一个真实 state 可以被反复当作 imagination 的起点，并在不同版本的 actor 下展开不同的未来。</p><p>所以 model-based RL 的“数据杠杆”不是凭空创造真实信息，而是：</p>$$
+\boxed{
+\text{少量昂贵 real interaction}
+\rightarrow
+\text{learn model}
+\rightarrow
+\text{大量便宜 synthetic policy updates}
+}
+$$<p>但这也直接带来风险：</p>$$
+\boxed{
+\text{model bias}
+}
+$$<p>如果：</p>$$
+\hat s_{t+1}\neq s_{t+1}^{real}
+$$<p>甚至模型错误会被 policy 主动利用，就会出现 model exploitation。</p><p>所以 imagination 从来不是“免费真数据”。</p><hr><h2 id=5-muzero2020world-model-一定要还原世界吗>5. MuZero（2020）：World Model 一定要还原世界吗？<a hidden class=anchor aria-hidden=true href=#5-muzero2020world-model-一定要还原世界吗>#</a></h2><p><strong>论文：Julian Schrittwieser et al., <em>Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model</em>, Nature 2020</strong></p><p>看到 PlaNet / Dreamer 后，一个更根本的问题出现了：</p><blockquote><p>为什么 world model 一定要能把 observation 重建出来？</p></blockquote><p>MuZero 的回答非常激进：</p>$$
+\boxed{
+\text{不需要}
+}
+$$<hr><h3 id=51-只学习-planning-真正需要的东西>5.1 只学习 planning 真正需要的东西<a hidden class=anchor aria-hidden=true href=#51-只学习-planning-真正需要的东西>#</a></h3><p>MuZero 学三类模型：</p><h3 id=representation>Representation<a hidden class=anchor aria-hidden=true href=#representation>#</a></h3>$$
+h(o_{1:t})\rightarrow s_t
+$$<h3 id=dynamics>Dynamics<a hidden class=anchor aria-hidden=true href=#dynamics>#</a></h3>$$
+g(s_t,a_t)\rightarrow(s_{t+1},r_t)
+$$<h3 id=prediction>Prediction<a hidden class=anchor aria-hidden=true href=#prediction>#</a></h3>$$
+f(s_t)\rightarrow(\pi_t,v_t)
+$$<p>它并不要求：</p>$$
+s_t\rightarrow o_t
+$$<p>也就是说，latent state 不需要还原 pixel，也不需要对应一个人类可解释的物理状态。</p><p>它只需要能够支持：</p>$$
+\boxed{
+\text{reward}
++
+\text{value}
++
+\text{policy}
+}
+$$<p>预测和 MCTS planning。</p><p>Nature 论文对 MuZero 的概括非常直接：<br>模型学习的是 <strong>predictions relevant to planning</strong>，包括 policy、value 和 reward，而不是完整复原环境 dynamics。</p><hr><h3 id=52-alphazero--muzero>5.2 AlphaZero → MuZero<a hidden class=anchor aria-hidden=true href=#52-alphazero--muzero>#</a></h3><p>这个区别也很清楚。</p><p>AlphaZero 做 tree search，但棋类规则本身是已知的：</p>$$
+(s_t,a_t)\rightarrow s_{t+1}
+$$<p>环境 simulator 是现成的。</p><p>MuZero 则把 simulator 本身也学出来：</p><h1 id=textalphazero>$$
+\boxed{
+\text{AlphaZero}</h1><p>\text{known dynamics}
++
+\text{search}
+}
+$$</p><h1 id=textmuzero>$$
+\boxed{
+\text{MuZero}</h1><p>\text{learned latent dynamics}
++
+\text{search}
+}
+$$</p><p>所以 MuZero 给 world model 留下了一个很重要的认识：</p>$$
+\boxed{
+\text{good world model}
+\neq
+\text{perfect reconstruction of the world}
+}
+$$<p>更准确地说，对于 planning：</p>$$
+\boxed{
+\text{decision-sufficient}
+}
+$$<p>可能比：</p>$$
+\text{observation-complete}
+$$<p>更重要。</p><p>这条思想后面会重新出现在 JEPA / feature prediction 等路线里，只是训练目标不同。</p><hr><h2 id=6-到这里为止我们主要看的其实只是-dec--seq--glv>6. 到这里为止：我们主要看的其实只是 Dec / Seq / GLV<a hidden class=anchor aria-hidden=true href=#6-到这里为止我们主要看的其实只是-dec--seq--glv>#</a></h2><p>后来借助 embodied world model survey，才发现前面这条经典线在整个现代 taxonomy 里其实只是一个象限：</p>$$
+\boxed{
+\text{Decision-Coupled}
++
+\text{Sequential}
++
+\text{Global Latent Vector}
+}
+$$<p>PlaNet、Dreamer 系列都属于这一支。</p><p>这里的默认假设大概是：</p>$$
+\text{世界}
+\rightarrow
+\text{一个 compact latent state}
+$$<p>然后：</p>$$
+s_t\rightarrow s_{t+1}
+$$<p>按时间一步一步 rollout，并直接服务 planning / control。</p><p>接下来我们开始逐一问：</p><blockquote><p>这些假设真的必须成立吗？</p></blockquote><hr><h2 id=7-iris--tfs世界一定要压成一个-latent-vector-吗>7. IRIS / TFS：世界一定要压成一个 latent vector 吗？<a hidden class=anchor aria-hidden=true href=#7-iris--tfs世界一定要压成一个-latent-vector-吗>#</a></h2><p><strong>代表论文：Vincent Micheli, Eloi Alonso, François Fleuret, <em>Transformers are Sample-Efficient World Models (IRIS)</em>, ICLR 2023</strong></p><p>Dreamer-style GLV 的思维还是：</p>$$
+o_t\rightarrow z_t\in\mathbb R^d
+$$<p>也就是整个世界被压缩成一个全局状态。</p><p>Token Feature Sequence（TFS）则变成：</p>$$
+o_t
+\rightarrow
+X_t=[x_t^1,x_t^2,\ldots,x_t^N]
+$$<p>世界不再只是一个 vector，而是一组 token / feature。</p><hr><h3 id=71-iris把环境变成一种-sequence-modeling-问题>7.1 IRIS：把环境变成一种 sequence modeling 问题<a hidden class=anchor aria-hidden=true href=#71-iris把环境变成一种-sequence-modeling-问题>#</a></h3><p>IRIS 使用：</p>$$
+\boxed{
+\text{discrete autoencoder}
++
+\text{autoregressive Transformer}
+}
+$$<p>先把 observation 编成离散 visual tokens，然后 Transformer 建模 token 和 action 的时序关系。</p><p>于是 world dynamics 越来越像：</p>$$
+p(X_{t+1}\mid X_{\leq t},a_{\leq t})
+$$<p>而不是传统 RSSM 的：</p>$$
+p(z_{t+1}\mid z_t,a_t)
+$$<p>论文在 Atari 100k 上强调的重点就是 <strong>sample-efficient world-model learning</strong>：通过 learned world model 中的 imagined experience 来训练 agent，同时让 Transformer 承担环境序列建模。</p><hr><h3 id=72-representation-philosophy-发生了变化>7.2 representation philosophy 发生了变化<a hidden class=anchor aria-hidden=true href=#72-representation-philosophy-发生了变化>#</a></h3><p>这不是简单：</p><blockquote><p>RNN 换成 Transformer。</p></blockquote><p>更重要的是：</p>$$
+\boxed{
+\text{world = one compact state}
+}
+$$<p>开始变成：</p>$$
+\boxed{
+\text{world = structured collection of tokens}
+}
+$$<p>这样 vision、language、proprioception、action 等不同 modality 都更容易进入同一个 sequence framework：</p>$$
+[
+\text{vision tokens},
+\text{language tokens},
+\text{action tokens},
+\text{proprio tokens}
+]
+$$<p>于是这条路线很自然会继续走向：</p>$$
+\boxed{
+\text{World Model}
++
+\text{VLA}
+\rightarrow
+\text{World-Action Model}
+}
+$$<p>这里 world prediction 和 action prediction 的边界开始变得没有过去那么清楚。</p><hr><h2 id=8-occworld--slgtoken-够不够空间结构要不要显式保留>8. OccWorld / SLG：token 够不够？空间结构要不要显式保留？<a hidden class=anchor aria-hidden=true href=#8-occworld--slgtoken-够不够空间结构要不要显式保留>#</a></h2><p><strong>论文：Wenzhao Zheng et al., <em>OccWorld: Learning a 3D Occupancy World Model for Autonomous Driving</em>, ECCV 2024</strong></p><p>继续往 embodied / robot 方向走，会碰到另一个问题：</p><blockquote><p>如果机器人真正关心的是位置、距离、碰撞和可达性，仅仅把世界表示成 token 是否太隐式了？</p></blockquote><p>于是 Spatial Latent Grid（SLG）把空间结构直接放进 representation。</p><hr><h3 id=81-世界直接表示成-occupancy>8.1 世界直接表示成 occupancy<a hidden class=anchor aria-hidden=true href=#81-世界直接表示成-occupancy>#</a></h3><p>可以粗略写成：</p>$$
+O_t(x,y,z)
+$$<p>描述三维空间中不同位置：</p><ul><li>是否被占据；</li><li>是什么语义；</li><li>哪些区域是 free space。</li></ul><p>相比 bounding box，occupancy 能保存更细粒度的 3D scene structure。</p><p>OccWorld 先学习一个 reconstruction-based scene tokenizer，把 3D occupancy 压成离散 scene tokens，再使用 GPT-like spatial-temporal generative Transformer 同时预测：</p>$$
+\text{future scene tokens}
+$$<p>和：</p>$$
+\text{future ego tokens}
+$$<p>最后 decode 成：</p>$$
+\hat O_{t+1:t+H}
+$$<p>以及 ego trajectory。</p><p>所以它很有意思：</p>$$
+\boxed{
+\text{representation 是 spatial}
+\quad
+\text{但 dynamics 内部又可以 token 化}
+}
+$$<p>taxonomy 并不是互斥的网络结构标签，而是在描述模型最终保留了什么世界结构。</p><hr><h3 id=82-为什么这对-planning-很自然>8.2 为什么这对 planning 很自然？<a hidden class=anchor aria-hidden=true href=#82-为什么这对-planning-很自然>#</a></h3><p>如果 future state 本身就是 occupancy：</p>$$
+O_{t+1:t+H}
+$$<p>那么规划器很容易直接评价：</p><blockquote><p>这条 trajectory 会不会穿过未来被占据的位置？</p></blockquote><p>因此 world representation 和 downstream cost 的接口非常直接：</p>$$
+\boxed{
+\text{future occupancy}
+\rightarrow
+\text{trajectory evaluation}
+}
+$$<p>OccWorld 的实验也显示，它不仅能做 3D scene forecasting，还能在不使用 instance 和 map supervision 的条件下得到有竞争力的 planning 结果。</p><p>这里的 inductive bias 很明确：</p>$$
+\boxed{
+\text{真实世界具有需要显式保留的空间拓扑}
+}
+$$<p>代价则是更高的计算和存储成本。</p><hr><h2 id=9-jepa--v-jepa为什么一定要预测-pixel>9. JEPA / V-JEPA：为什么一定要预测 pixel？<a hidden class=anchor aria-hidden=true href=#9-jepa--v-jepa为什么一定要预测-pixel>#</a></h2><p>走到这里，又出现一个和 MuZero 有点相似、但来源不同的问题：</p><blockquote><p>如果我们真正关心的是稳定、抽象、可预测的规律，为什么要让模型预测所有 pixel？</p></blockquote><p>例如：</p><ul><li>树叶具体怎么晃；</li><li>微小光照变化；</li><li>纹理细节；</li><li>sensor noise。</li></ul><p>这些东西很难预测，但未必是理解世界和做决策最重要的部分。</p><p>JEPA 的回答是：</p>$$
+\boxed{
+\text{不要预测 pixel，预测 representation}
+}
+$$<hr><h3 id=91-jepa-的基本结构>9.1 JEPA 的基本结构<a hidden class=anchor aria-hidden=true href=#91-jepa-的基本结构>#</a></h3><p>最核心的三部分是：</p>$$
+\text{context encoder}
++
+\text{target encoder}
++
+\text{predictor}
+$$<p>context encoder 看到可见区域：</p>$$
+x_c\rightarrow z_c
+$$<p>target encoder 为被遮住的真实区域产生表示：</p>$$
+x_{\text{target}}\rightarrow z_{\text{target}}
+$$<p>predictor 只根据 context representation 去预测：</p><h1 id=hat-z_texttarget>$$
+\hat z_{\text{target}}</h1><p>P(z_c,\text{target position})
+$$</p><p>训练目标是：</p>$$
+\hat z_{\text{target}}
+\approx
+z_{\text{target}}
+$$<p>而不是：</p>$$
+\hat x_{\text{target}}
+\approx
+x_{\text{target}}
+$$<p>V-JEPA 把这一思想放到视频中，通过 masked spatiotemporal feature prediction 学习 motion 和 appearance representation。论文特别强调：它只使用 feature prediction objective，不依赖 pixel reconstruction、text supervision 或 negative examples。</p><hr><h3 id=92-它和-muzero像在哪里又不一样在哪里>9.2 它和 MuZero像在哪里，又不一样在哪里？<a hidden class=anchor aria-hidden=true href=#92-它和-muzero像在哪里又不一样在哪里>#</a></h3><p>两者都在反对：</p>$$
+\boxed{
+\text{world model 必须完整复刻 observation}
+}
+$$<p>但它们的 inductive bias 不一样。</p><p>MuZero 用：</p>$$
+\text{reward / value / policy}
+$$<p>来定义“什么信息值得保留”。</p><p>所以它非常 task-coupled。</p><p>JEPA 则使用：</p>$$
+\text{representation predictability}
+$$<p>来定义值得学习的结构，希望先得到更 general-purpose 的 representation。</p><p>因此可以粗略理解：</p>$$
+\boxed{
+\text{MuZero：对决策 sufficient}
+}
+$$$$
+\boxed{
+\text{JEPA：对世界的可预测结构 sufficient}
+}
+$$<p>这也是为什么后者更容易被放到 general-purpose world model 这一侧。</p><hr><h2 id=10-回头看这些论文其实不是在争同一个-architecture>10. 回头看：这些论文其实不是在争同一个 architecture<a hidden class=anchor aria-hidden=true href=#10-回头看这些论文其实不是在争同一个-architecture>#</a></h2><p>如果只按模型名字看，很容易把历史理解成：</p>$$
+\text{RNN}
+\rightarrow
+\text{Transformer}
+\rightarrow
+\text{Diffusion}
+$$<p>但我们一路看下来，更像是在不断修改四个问题。</p><hr><h3 id=101-state-应该是什么>10.1 State 应该是什么？<a hidden class=anchor aria-hidden=true href=#101-state-应该是什么>#</a></h3><p>最开始：</p>$$
+\boxed{
+\text{global latent vector}
+}
+$$<p>World Models / PlaNet / Dreamer 都基本属于这种思路。</p><p>然后：</p>$$
+\boxed{
+\text{token feature sequence}
+}
+$$<p>世界变成可以组合、交互的一组 token。</p><p>再到：</p>$$
+\boxed{
+\text{spatial / 3D representation}
+}
+$$<p>显式保存几何和 topology。</p><p>所以这里的演进不是“表示越来越大”这么简单，而是：</p>$$
+\text{我愿意给模型什么结构先验？}
+$$<p>GLV 假设一个 compact state 足够；</p><p>TFS 强调 compositional / relational structure；</p><p>SLG 则进一步认为 geometry 本身应该被显式编码。</p><hr><h3 id=102-future-应该预测什么>10.2 Future 应该预测什么？<a hidden class=anchor aria-hidden=true href=#102-future-应该预测什么>#</a></h3><p>最早很自然会想到：</p>$$
+\text{未来 observation / pixel}
+$$<p>然后变成：</p>$$
+\text{future latent state}
+$$<p>MuZero 又进一步说：</p>$$
+\text{只预测 planning relevant quantities}
+$$<p>JEPA 则说：</p>$$
+\text{预测 abstract representation}
+$$<p>于是出现一个我觉得很重要的变化：</p>$$
+\boxed{
+\text{“把未来复制出来”}
+\rightarrow
+\text{“把未来真正有用的结构预测出来”}
+}
+$$<p>但“有用”到底如何定义，不同路线的答案并不一样。</p><hr><h3 id=103-时间应该怎么建模>10.3 时间应该怎么建模？<a hidden class=anchor aria-hidden=true href=#103-时间应该怎么建模>#</a></h3><p>World Models / PlaNet / Dreamer 都有很强的 sequential flavor：</p>$$
+s_t
+\rightarrow
+s_{t+1}
+\rightarrow
+s_{t+2}
+\rightarrow\cdots
+$$<p>它的问题很明显：</p>$$
+\text{error accumulation}
+$$<p>以及：</p>$$
+\text{long-horizon consistency}
+$$<p>后来 Transformer/token world model 把 temporal modeling 重新写成 sequence modeling。</p><p>再往现代 generative / global prediction 的方向走，又会出现：</p>$$
+\boxed{
+\text{不一定逐步 autoregressive rollout，
+而是直接预测更长 future block}
+}
+$$<p>我们目前只建立了这个分支的概念，还没有深入 diffusion / DiT 细节。</p><hr><h3 id=104-prediction-最后怎么变成-decision>10.4 Prediction 最后怎么变成 Decision？<a hidden class=anchor aria-hidden=true href=#104-prediction-最后怎么变成-decision>#</a></h3><p>这里的路线也非常有意思。</p><h3 id=world-models>World Models<a hidden class=anchor aria-hidden=true href=#world-models>#</a></h3>$$
+\text{world model}
+\rightarrow
+\text{controller}
+$$<h3 id=planet>PlaNet<a hidden class=anchor aria-hidden=true href=#planet>#</a></h3>$$
+\text{world model}
+\rightarrow
+\text{CEM online planning}
+$$<h3 id=dreamer>Dreamer<a hidden class=anchor aria-hidden=true href=#dreamer>#</a></h3>$$
+\text{world model}
+\rightarrow
+\text{imagined actor/value learning}
+$$<h3 id=muzero>MuZero<a hidden class=anchor aria-hidden=true href=#muzero>#</a></h3>$$
+\text{learned latent model}
+\rightarrow
+\text{MCTS}
+$$<p>再往 World-Action Model / VLA 方向走：</p>$$
+\text{world prediction}
++
+\text{action prediction}
+$$<p>可能逐渐进入同一个 model。</p><p>于是我们反复碰到一个很通用的 trade-off：</p>$$
+\boxed{
+\text{inference-time search}
+\leftrightarrow
+\text{amortized policy}
+}
+$$<p>PlaNet 把很多计算留到现场；</p><p>Dreamer 把更多计算放进训练并沉淀到 policy；</p><p>MuZero 又保留了强 search；</p><p>现代 VLA / world-action model 则可能进一步把 planning pattern 吸进大规模 sequence model。</p><hr><h2 id=11-暂时形成的理解world-model-不等于未来视频生成器>11. 暂时形成的理解：World Model 不等于“未来视频生成器”<a hidden class=anchor aria-hidden=true href=#11-暂时形成的理解world-model-不等于未来视频生成器>#</a></h2><p>最开始很容易把 world model 理解成：</p><blockquote><p>给过去几帧，生成未来几帧。</p></blockquote><p>但一路看下来，这个定义明显太窄。</p><p>现在我更愿意把它写成：</p>$$
+\boxed{
+\text{学习一个能够表达环境状态，并支持关于未来进行推演的内部模型}
+}
+$$<p>关键不在于这个内部模型是不是：</p><ul><li>pixel；</li><li>token；</li><li>vector；</li><li>occupancy；</li><li>3D field。</li></ul><p>真正的问题是：</p>$$
+\boxed{
+\text{它有没有保留进行未来预测和决策所需要的结构？}
+}
+$$<p>这也解释了为什么不同 world model 看起来差异越来越大：</p><ul><li>Dreamer 的 world 很小，是 compact latent；</li><li>MuZero 的 world 甚至不用还原 observation；</li><li>OccWorld 的 world 很几何，是 occupancy；</li><li>JEPA 的 world 更像一个抽象 feature space。</li></ul><p>它们并不是在逼近同一个“唯一正确的世界表示”。</p><hr><h2 id=12-一个暂时没有答案的问题什么才是-sufficient-representation>12. 一个暂时没有答案的问题：什么才是 sufficient representation？<a hidden class=anchor aria-hidden=true href=#12-一个暂时没有答案的问题什么才是-sufficient-representation>#</a></h2><p>现在回头看，这可能是整条线里最核心的问题：</p>$$
+\boxed{
+\text{什么信息对未来预测和控制是 sufficient 的？}
+}
+$$<p>太弱的 representation：</p>$$
+\Rightarrow
+\text{预测不了真正重要的 dynamics}
+$$<p>太强、太完整的 representation：</p>$$
+\Rightarrow
+\text{大量容量浪费在不可预测或与任务无关的细节}
+$$<p>所以不同路线其实在不同地方押注：</p>$$
+\text{Dreamer}
+\rightarrow
+\text{compact predictive latent}
+$$$$
+\text{MuZero}
+\rightarrow
+\text{decision-relevant latent}
+$$$$
+\text{TFS}
+\rightarrow
+\text{compositional token state}
+$$$$
+\text{OccWorld}
+\rightarrow
+\text{geometry-aware spatial state}
+$$$$
+\text{JEPA}
+\rightarrow
+\text{predictable abstract representation}
+$$<p>到这里，我不太想直接下结论说其中哪一个更“正确”。</p><p>更合理的问题是：</p><blockquote><p><strong>对于具体的 downstream problem，哪些信息必须显式保存，哪些可以压掉？</strong></p></blockquote><hr><h2 id=13-目前这段阅读可以压成一条问题演进线>13. 目前这段阅读可以压成一条问题演进线<a hidden class=anchor aria-hidden=true href=#13-目前这段阅读可以压成一条问题演进线>#</a></h2><p>最后不按年份，而按我们遇到问题的顺序记：</p>$$
+\boxed{\text{World Models}}
+$$<blockquote><p>能不能先学一个世界，再在里面行动？</p></blockquote>$$
+\downarrow
+$$$$
+\boxed{\text{PlaNet}}
+$$<blockquote><p>representation 和 dynamics 为什么要分开学？<br>能不能直接在 latent world 里 planning？</p></blockquote>$$
+\downarrow
+$$$$
+\boxed{\text{Dreamer}}
+$$<blockquote><p>每次都在线搜索是不是太贵？<br>能不能把 imagined experience 内化进 policy？</p></blockquote>$$
+\downarrow
+$$$$
+\boxed{\text{MuZero}}
+$$<blockquote><p>world model 一定要还原真实 observation 吗？</p></blockquote>$$
+\downarrow
+$$$$
+\boxed{\text{IRIS / TFS}}
+$$<blockquote><p>世界一定要压成一个 global latent vector 吗？</p></blockquote>$$
+\downarrow
+$$$$
+\boxed{\text{OccWorld / SLG}}
+$$<blockquote><p>embodied system 所需要的 geometry 是否应该显式保留？</p></blockquote>$$
+\downarrow
+$$$$
+\boxed{\text{JEPA / V-JEPA}}
+$$<blockquote><p>为什么还要预测所有 pixel？<br>能不能只预测抽象、稳定、可预测的 representation？</p></blockquote><p>然后问题又回到了最开始：</p>$$
+\boxed{
+\text{到底什么才是一个“足够好的内部世界”？}
+}
+$$<p>现在的暂时答案不是某种具体 architecture，而更像：</p>$$
+\boxed{
+\text{一个好的 World Model，
+应该保留对未来推演和下游决策真正 sufficient 的结构。}
+}
+$$<p>问题在于，<strong>什么叫 sufficient，取决于我们最终到底想让 agent 做什么。</strong></p><hr><h2 id=参考论文>参考论文<a hidden class=anchor aria-hidden=true href=#参考论文>#</a></h2><ol><li>Ha, D., & Schmidhuber, J. <strong>World Models</strong>. 2018.</li><li>Hafner, D., et al. <strong>Learning Latent Dynamics for Planning from Pixels (PlaNet)</strong>. ICML 2019.</li><li>Hafner, D., et al. <strong>Dream to Control: Learning Behaviors by Latent Imagination (Dreamer)</strong>. ICLR 2020.</li><li>Schrittwieser, J., et al. <strong>Mastering Atari, Go, Chess and Shogi by Planning with a Learned Model (MuZero)</strong>. Nature, 2020.</li><li>Micheli, V., Alonso, E., & Fleuret, F. <strong>Transformers are Sample-Efficient World Models (IRIS)</strong>. ICLR 2023.</li><li>Zheng, W., et al. <strong>OccWorld: Learning a 3D Occupancy World Model for Autonomous Driving</strong>. ECCV 2024.</li><li>Bardes, A., et al. <strong>Revisiting Feature Prediction for Learning Visual Representations from Video (V-JEPA)</strong>. 2024.</li><li><strong>A Comprehensive Survey on World Models for Embodied AI</strong>. 用于本文中 Dec/Seq/GLV、TFS、SLG、General-Purpose 等 taxonomy 的定位。</li></ol></div><footer class=post-footer><ul class=post-tags></ul><nav class=paginav><a class=next href=https://letsgetai.github.io/posts/vae-to-world-model/><span class=title>下一页 »</span>
+<span>从 VAE 到世界模型：从概率建模到 Sequential Latent World Model（图解版）</span></a></nav><ul class=share-buttons><li><a target=_blank rel="noopener noreferrer" aria-label="share World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录 on x" href="https://x.com/intent/tweet/?text=World%20Model%ef%bc%9a%e4%bb%8e%e2%80%9c%e5%ad%a6%e4%b8%80%e4%b8%aa%e4%b8%96%e7%95%8c%e2%80%9d%e5%88%b0%e2%80%9c%e5%ad%a6%e5%af%b9%e5%86%b3%e7%ad%96%e6%9c%89%e7%94%a8%e7%9a%84%e6%9c%aa%e6%9d%a5%e2%80%9d%e2%80%94%e2%80%94%e4%b8%80%e6%ac%a1%e9%97%ae%e9%a2%98%e6%bc%94%e8%bf%9b%e8%ae%b0%e5%bd%95&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2fworld-model-problem-evolution%2f&amp;hashtags="><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M512 62.554V449.446C512 483.97 483.97 512 449.446 512H62.554C28.03 512 0 483.97.0 449.446V62.554C0 28.03 28.029.0 62.554.0H449.446C483.971.0 512 28.03 512 62.554zM269.951 190.75 182.567 75.216H56L207.216 272.95 63.9 436.783h61.366L235.9 310.383l96.667 126.4H456L298.367 228.367l134-153.151H371.033zM127.633 110h36.468l219.38 290.065H349.5z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录 on linkedin" href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2fworld-model-problem-evolution%2f&amp;title=World%20Model%ef%bc%9a%e4%bb%8e%e2%80%9c%e5%ad%a6%e4%b8%80%e4%b8%aa%e4%b8%96%e7%95%8c%e2%80%9d%e5%88%b0%e2%80%9c%e5%ad%a6%e5%af%b9%e5%86%b3%e7%ad%96%e6%9c%89%e7%94%a8%e7%9a%84%e6%9c%aa%e6%9d%a5%e2%80%9d%e2%80%94%e2%80%94%e4%b8%80%e6%ac%a1%e9%97%ae%e9%a2%98%e6%bc%94%e8%bf%9b%e8%ae%b0%e5%bd%95&amp;summary=World%20Model%ef%bc%9a%e4%bb%8e%e2%80%9c%e5%ad%a6%e4%b8%80%e4%b8%aa%e4%b8%96%e7%95%8c%e2%80%9d%e5%88%b0%e2%80%9c%e5%ad%a6%e5%af%b9%e5%86%b3%e7%ad%96%e6%9c%89%e7%94%a8%e7%9a%84%e6%9c%aa%e6%9d%a5%e2%80%9d%e2%80%94%e2%80%94%e4%b8%80%e6%ac%a1%e9%97%ae%e9%a2%98%e6%bc%94%e8%bf%9b%e8%ae%b0%e5%bd%95&amp;source=https%3a%2f%2fletsgetai.github.io%2fposts%2fworld-model-problem-evolution%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zM160.461 423.278V197.561h-75.04v225.717h75.04zm270.539.0V293.839c0-69.333-37.018-101.586-86.381-101.586-39.804.0-57.634 21.891-67.617 37.266v-31.958h-75.021c.995 21.181.0 225.717.0 225.717h75.02V297.222c0-6.748.486-13.492 2.474-18.315 5.414-13.475 17.767-27.434 38.494-27.434 27.135.0 38.007 20.707 38.007 51.037v120.768H431zM123.448 88.722C97.774 88.722 81 105.601 81 127.724c0 21.658 16.264 39.002 41.455 39.002h.484c26.165.0 42.452-17.344 42.452-39.002-.485-22.092-16.241-38.954-41.943-39.002z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录 on reddit" href="https://reddit.com/submit?url=https%3a%2f%2fletsgetai.github.io%2fposts%2fworld-model-problem-evolution%2f&title=World%20Model%ef%bc%9a%e4%bb%8e%e2%80%9c%e5%ad%a6%e4%b8%80%e4%b8%aa%e4%b8%96%e7%95%8c%e2%80%9d%e5%88%b0%e2%80%9c%e5%ad%a6%e5%af%b9%e5%86%b3%e7%ad%96%e6%9c%89%e7%94%a8%e7%9a%84%e6%9c%aa%e6%9d%a5%e2%80%9d%e2%80%94%e2%80%94%e4%b8%80%e6%ac%a1%e9%97%ae%e9%a2%98%e6%bc%94%e8%bf%9b%e8%ae%b0%e5%bd%95"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zM446 265.638c0-22.964-18.616-41.58-41.58-41.58-11.211.0-21.361 4.457-28.841 11.666-28.424-20.508-67.586-33.757-111.204-35.278l18.941-89.121 61.884 13.157c.756 15.734 13.642 28.29 29.56 28.29 16.407.0 29.706-13.299 29.706-29.701.0-16.403-13.299-29.702-29.706-29.702-11.666.0-21.657 6.792-26.515 16.578l-69.105-14.69c-1.922-.418-3.939-.042-5.585 1.036-1.658 1.073-2.811 2.761-3.224 4.686l-21.152 99.438c-44.258 1.228-84.046 14.494-112.837 35.232-7.468-7.164-17.589-11.591-28.757-11.591-22.965.0-41.585 18.616-41.585 41.58.0 16.896 10.095 31.41 24.568 37.918-.639 4.135-.99 8.328-.99 12.576.0 63.977 74.469 115.836 166.33 115.836s166.334-51.859 166.334-115.836c0-4.218-.347-8.387-.977-12.493 14.564-6.47 24.735-21.034 24.735-38.001zM326.526 373.831c-20.27 20.241-59.115 21.816-70.534 21.816-11.428.0-50.277-1.575-70.522-21.82-3.007-3.008-3.007-7.882.0-10.889 3.003-2.999 7.882-3.003 10.885.0 12.777 12.781 40.11 17.317 59.637 17.317 19.522.0 46.86-4.536 59.657-17.321 3.016-2.999 7.886-2.995 10.885.008 3.008 3.011 3.003 7.882-.008 10.889zm-5.23-48.781c-16.373.0-29.701-13.324-29.701-29.698.0-16.381 13.328-29.714 29.701-29.714 16.378.0 29.706 13.333 29.706 29.714.0 16.374-13.328 29.698-29.706 29.698zM160.91 295.348c0-16.381 13.328-29.71 29.714-29.71 16.369.0 29.689 13.329 29.689 29.71.0 16.373-13.32 29.693-29.689 29.693-16.386.0-29.714-13.32-29.714-29.693z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录 on facebook" href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fletsgetai.github.io%2fposts%2fworld-model-problem-evolution%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H342.978V319.085h66.6l12.672-82.621h-79.272v-53.617c0-22.603 11.073-44.636 46.58-44.636H425.6v-70.34s-32.71-5.582-63.982-5.582c-65.288.0-107.96 39.569-107.96 111.204v62.971h-72.573v82.621h72.573V512h-191.104c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录 on whatsapp" href="https://api.whatsapp.com/send?text=World%20Model%ef%bc%9a%e4%bb%8e%e2%80%9c%e5%ad%a6%e4%b8%80%e4%b8%aa%e4%b8%96%e7%95%8c%e2%80%9d%e5%88%b0%e2%80%9c%e5%ad%a6%e5%af%b9%e5%86%b3%e7%ad%96%e6%9c%89%e7%94%a8%e7%9a%84%e6%9c%aa%e6%9d%a5%e2%80%9d%e2%80%94%e2%80%94%e4%b8%80%e6%ac%a1%e9%97%ae%e9%a2%98%e6%bc%94%e8%bf%9b%e8%ae%b0%e5%bd%95%20-%20https%3a%2f%2fletsgetai.github.io%2fposts%2fworld-model-problem-evolution%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zm-58.673 127.703c-33.842-33.881-78.847-52.548-126.798-52.568-98.799.0-179.21 80.405-179.249 179.234-.013 31.593 8.241 62.428 23.927 89.612l-25.429 92.884 95.021-24.925c26.181 14.28 55.659 21.807 85.658 21.816h.074c98.789.0 179.206-80.413 179.247-179.243.018-47.895-18.61-92.93-52.451-126.81zM263.976 403.485h-.06c-26.734-.01-52.954-7.193-75.828-20.767l-5.441-3.229-56.386 14.792 15.05-54.977-3.542-5.637c-14.913-23.72-22.791-51.136-22.779-79.287.033-82.142 66.867-148.971 149.046-148.971 39.793.014 77.199 15.531 105.329 43.692 28.128 28.16 43.609 65.592 43.594 105.4-.034 82.149-66.866 148.983-148.983 148.984zm81.721-111.581c-4.479-2.242-26.499-13.075-30.604-14.571-4.105-1.495-7.091-2.241-10.077 2.241-2.986 4.483-11.569 14.572-14.182 17.562-2.612 2.988-5.225 3.364-9.703 1.12-4.479-2.241-18.91-6.97-36.017-22.23C231.8 264.15 222.81 249.484 220.198 245s-.279-6.908 1.963-9.14c2.016-2.007 4.48-5.232 6.719-7.847 2.24-2.615 2.986-4.484 4.479-7.472 1.493-2.99.747-5.604-.374-7.846-1.119-2.241-10.077-24.288-13.809-33.256-3.635-8.733-7.327-7.55-10.077-7.688-2.609-.13-5.598-.158-8.583-.158-2.986.0-7.839 1.121-11.944 5.604-4.105 4.484-15.675 15.32-15.675 37.364.0 22.046 16.048 43.342 18.287 46.332 2.24 2.99 31.582 48.227 76.511 67.627 10.685 4.615 19.028 7.371 25.533 9.434 10.728 3.41 20.492 2.929 28.209 1.775 8.605-1.285 26.499-10.833 30.231-21.295 3.732-10.464 3.732-19.431 2.612-21.298-1.119-1.869-4.105-2.99-8.583-5.232z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录 on telegram" href="https://telegram.me/share/url?text=World%20Model%ef%bc%9a%e4%bb%8e%e2%80%9c%e5%ad%a6%e4%b8%80%e4%b8%aa%e4%b8%96%e7%95%8c%e2%80%9d%e5%88%b0%e2%80%9c%e5%ad%a6%e5%af%b9%e5%86%b3%e7%ad%96%e6%9c%89%e7%94%a8%e7%9a%84%e6%9c%aa%e6%9d%a5%e2%80%9d%e2%80%94%e2%80%94%e4%b8%80%e6%ac%a1%e9%97%ae%e9%a2%98%e6%bc%94%e8%bf%9b%e8%ae%b0%e5%bd%95&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2fworld-model-problem-evolution%2f"><svg viewBox="2 2 28 28" height="30" width="30" fill="currentColor"><path d="M26.49 29.86H5.5a3.37 3.37.0 01-2.47-1 3.35 3.35.0 01-1-2.47V5.48A3.36 3.36.0 013 3 3.37 3.37.0 015.5 2h21A3.38 3.38.0 0129 3a3.36 3.36.0 011 2.46V26.37a3.35 3.35.0 01-1 2.47 3.38 3.38.0 01-2.51 1.02zm-5.38-6.71a.79.79.0 00.85-.66L24.73 9.24a.55.55.0 00-.18-.46.62.62.0 00-.41-.17q-.08.0-16.53 6.11a.59.59.0 00-.41.59.57.57.0 00.43.52l4 1.24 1.61 4.83a.62.62.0 00.63.43.56.56.0 00.4-.17L16.54 20l4.09 3A.9.9.0 0021.11 23.15zM13.8 20.71l-1.21-4q8.72-5.55 8.78-5.55c.15.0.23.0.23.16a.18.18.0 010 .06s-2.51 2.3-7.52 6.8z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录 on ycombinator" href="https://news.ycombinator.com/submitlink?t=World%20Model%ef%bc%9a%e4%bb%8e%e2%80%9c%e5%ad%a6%e4%b8%80%e4%b8%aa%e4%b8%96%e7%95%8c%e2%80%9d%e5%88%b0%e2%80%9c%e5%ad%a6%e5%af%b9%e5%86%b3%e7%ad%96%e6%9c%89%e7%94%a8%e7%9a%84%e6%9c%aa%e6%9d%a5%e2%80%9d%e2%80%94%e2%80%94%e4%b8%80%e6%ac%a1%e9%97%ae%e9%a2%98%e6%bc%94%e8%bf%9b%e8%ae%b0%e5%bd%95&u=https%3a%2f%2fletsgetai.github.io%2fposts%2fworld-model-problem-evolution%2f"><svg width="30" height="30" viewBox="0 0 512 512" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554V449.446C512 483.97 483.97 512 449.446 512H62.554C28.03 512 0 483.97.0 449.446V62.554C0 28.03 28.029.0 62.554.0H449.446zM183.8767 87.9921h-62.034L230.6673 292.4508V424.0079h50.6655V292.4508L390.1575 87.9921H328.1233L256 238.2489z"/></svg></a></li></ul></footer></article></main><footer class=footer><span>&copy; 2026 <a href=https://letsgetai.github.io/>The Herta</a></span> ·
+<span>Powered by
+<a href="https://gohugo.io/?utm_source=papermod" rel=noopener target=_blank>Hugo</a> &
+<a href=https://github.com/adityatelange/hugo-PaperMod/ rel=noopener target=_blank>PaperMod</a></span></footer><a href=#top id=top-link class="top-link hidden" aria-label="go to top" title="Go to Top (Alt + G)" accesskey=g><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevrons-up"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
+</a><script>let menu=document.getElementById("menu");if(menu){const e=localStorage.getItem("menu-scroll-position");e&&(menu.scrollLeft=parseInt(e,10)),menu.onscroll=function(){localStorage.setItem("menu-scroll-position",menu.scrollLeft)}}document.querySelectorAll('a[href^="#"]').forEach(e=>{e.addEventListener("click",function(e){e.preventDefault();var t=this.getAttribute("href").substr(1);window.matchMedia("(prefers-reduced-motion: reduce)").matches?document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView():document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView({behavior:"smooth"}),t==="top"?history.replaceState(null,null," "):history.pushState(null,null,`#${t}`)})})</script><script>var toplink=document.getElementById("top-link");window.onscroll=function(){const e=window.innerHeight;document.body.scrollTop>e||document.documentElement.scrollTop>e?toplink.classList.remove("hidden"):toplink.classList.add("hidden")}</script><script>document.getElementById("theme-toggle").addEventListener("click",()=>{const e=document.querySelector("html");e.dataset.theme==="dark"?(e.dataset.theme="light",localStorage.setItem("pref-theme","light")):(e.dataset.theme="dark",localStorage.setItem("pref-theme","dark"))})</script><script>document.querySelectorAll("pre > code").forEach(e=>{const n=e.parentNode.parentNode,t=document.createElement("button");t.classList.add("copy-code"),t.innerHTML="复制";function s(){t.innerHTML="已复制！",setTimeout(()=>{t.innerHTML="复制"},2e3)}t.addEventListener("click",t=>{if("clipboard"in navigator){navigator.clipboard.writeText(e.textContent),s();return}const n=document.createRange();n.selectNodeContents(e);const o=window.getSelection();o.removeAllRanges(),o.addRange(n);try{document.execCommand("copy"),s()}catch{}o.removeRange(n)}),n.classList.contains("highlight")?n.appendChild(t):n.parentNode.firstChild==n||(e.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName=="TABLE"?e.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(t):e.parentNode.appendChild(t))})</script></body></html>
