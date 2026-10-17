@@ -984,14 +984,10 @@ $$
 
 ## 15. World Model 在这里应该怎么定位？
 
-World Model 不一定要作为第五个和 Planner 平级的模块。
-
-在目前这类 Long-Horizon 工作里，更自然的理解是：
+世界模型的使用位置由预测用途决定。在 $\tau_0$-VLA 这类基于候选子目标搜索的系统中，它提供 Planner 内部的前瞻机制：预测候选子目标对应的未来，再结合 value 评估与 beam search 选择后续子目标。
 
 $$
-\boxed{
-\text{World Model 是 Planner 内部的 Look-Ahead Mechanism}
-}
+\boxed{\text{World Model 为 Planner 提供前瞻评估}}
 $$
 
 普通 Planner：
@@ -1028,7 +1024,7 @@ $$
 }
 $$
 
-这也把 World Model 和 VLA 两条路线真正重新接上了。
+世界模型还可以参与失败监测、恢复目标选择及未来表示与训练迁移，文末专题将展开这些用途。
 
 ---
 
@@ -1963,6 +1959,52 @@ $$
 
 ---
 
+## 补充专题：World Model 在 Long-Horizon 系统中的几种位置
+
+在 Task State、Planner、Executor 与 Harness 的四模块框架中，世界模型的位置由预测用途决定。预测可以用于搜索动作、选择子目标、监测失败或选择恢复目标；未来表示的粒度与预测能力向控制的迁移，则是贯穿这些用途的设计选择。理解其作用，需要看清输入是什么、如何处理预测，以及输出改变了哪项决策。
+
+### 动作级搜索：PILOT
+
+[PILOT](https://arxiv.org/abs/2610.14335) 将视觉子目标与动作搜索结合起来：视频模型生成视觉子目标，策略提供动作序列初始化搜索，动作条件世界模型对候选序列进行 rollout，预测执行后的变化，用于评价候选。策略先验不以视觉子目标为输入，两者分别提供动作搜索的起点与视觉目标。
+
+搜索采用 CEM，即反复采样动作序列、评分、保留较好的候选，再更新采样分布。执行采用 MPC：每轮只执行选中序列的一小段，随后重新观察、重新规划。世界模型参与候选动作的比较，实际观测持续修正后续选择。
+
+论文在 4 个 UR5e 抓取放置任务上，每种方法每任务测试 20 次，共 80 次：PILOT 成功 55 次，成功率为 68.8%；同一微调后的 $\pi_0$ 直接执行成功 11 次，为 13.8%。在 Push-T 上，策略先验还减少了达到相同规划 cost 所需的 CEM 迭代数。
+
+### 预测式失败监测：Foresight
+
+[Foresight](https://arxiv.org/abs/2606.23085) 将当前观察和策略拟执行的下一段动作输入世界模型，再将预测的内部特征（latent）送入因果 Transformer，产生逐步失败分数，并校准判定阈值。输出可作为系统介入的信号。
+
+训练采用整条任务最终成败的弱监督，无须逐帧标注失败起点。论文在 LIBERO-Long、ManiSkill-Long 四个任务、BEHAVIOR-1K 所选四个任务，以及 ReactorX200 三个任务和 Franka 一个任务上评测失败检测。它承担 Verifier 用途，评测指标衡量的是失败检测能力。
+
+### 恢复目标选择：B2FF
+
+[B2FF](https://arxiv.org/abs/2606.09258) 在执行前，从干净的初始观察生成未来图像里程碑库。执行偏离后，系统结合当前状态与历史，按恢复潜力选择图像目标，引导冻结的 VLA 从当前真实状态继续行动。
+
+目标可以对应较早、当前或较后的任务进度：恢复可能需要回到先前阶段，也可能接向后续阶段。预测因此改变恢复时朝哪个目标行动，候选目标的可达性没有形式保证。
+
+论文在注入故障的 LIBERO 四套件上报告平均成功率：UD-VLA 为 56.3%，已知扰动注入时机触发恢复的 B2FF 为 74.0%，在线触发版为 64.5%。该设置包含三类可恢复扰动，排除了不可逆故障；74.0% 衡量已知触发时机下的恢复效果，64.5% 对应在线触发与恢复结合后的表现。
+
+### 未来表示与训练迁移：StructVLA
+
+[StructVLA](https://arxiv.org/abs/2603.12553) 从轨迹中抽取稀疏、具有运动学意义的视觉帧，包括夹爪开合转换，以及运动阶段转换处的低速稳定状态，再由离线 VLM 去除冗余。这样的未来表示保留操作中的关键结构，使预测目标集中于有意义的阶段变化。
+
+训练分为两个阶段：第一阶段学习结构帧预测；第二阶段将同一模型转为动作 token 预测，把视觉规划能力迁移到控制。世界模型在这里影响的是模型学习什么未来，以及这种能力如何进入动作预测。
+
+### 这些预测改变了什么？
+
+| 系统 | 预测对象 | 参与位置 | 改变的选择或学习 |
+| --- | --- | --- | --- |
+| PILOT | 候选动作条件下的未来 | Planner 的动作搜索／视觉子目标接口 | 选择当前执行的动作短前缀 |
+| [$\tau_0$-VLA](https://arxiv.org/abs/2608.16885) | 候选语义子目标对应的未来 | Planner 的子目标搜索 | 结合 value 与 beam search 选择子目标 |
+| Foresight | 拟执行动作对应的内部特征 | Harness 中的失败监测／Verifier | 输出可作为介入信号的失败分数 |
+| B2FF | 未来图像里程碑 | 恢复目标选择 | 从当前真实状态选择恢复锚点 |
+| StructVLA | 稀疏结构帧 | 未来表示与两阶段训练路线 | 将结构帧预测能力迁移到动作预测 |
+
+这些用途可以跨越模块边界。Foresight 评测失败检测，输出可作为介入信号；其他系统则通过动作搜索、子目标选择、恢复或训练迁移影响控制。判断世界模型的作用，应先明确预测改变哪项决策或学习过程，再检验是否改善任务表现。
+
+---
+
 ## 参考论文与入口
 
 1. **[What Matters in Orchestrating Robot Policies: A Systematic Study of Hierarchical VLA Agents](https://arxiv.org/abs/2606.10267)**
@@ -1978,3 +2020,11 @@ $$
 6. **[Long-Horizon Manipulation via Trace-Conditioned VLA Planning](https://arxiv.org/abs/2604.21924)**（LoHo-Manip）
 
 7. **[$\tau_0$-VLA: a Hierarchical Robot Foundation Model with World-Model-Guided Test-Time Computation](https://arxiv.org/abs/2608.16885)**
+
+8. **[PILOT: Guiding Long-Horizon World-Model Planning for Robot Manipulation with Visual Subgoals and Policy Priors](https://arxiv.org/abs/2610.14335)**
+
+9. **[Foresight: Failure Detection for Long-Horizon Robotic Manipulation with Action-Conditioned World Model Latents](https://arxiv.org/abs/2606.23085)**
+
+10. **[Back to the Familiar Future: Failure Recovery for VLA Policies via Pre-Imagined Milestone Selection](https://arxiv.org/abs/2606.09258)**
+
+11. **[Beyond Dense Futures: World Models as Structured Planners for Robotic Manipulation](https://arxiv.org/abs/2603.12553)**
