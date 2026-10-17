@@ -1,0 +1,736 @@
+<!doctype html><html lang=en dir=auto data-theme=auto><head><meta charset=utf-8><meta http-equiv=X-UA-Compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,shrink-to-fit=no"><meta name=robots content="index, follow"><title>VLA：动作建模与通用机器人策略 | The Herta</title><meta name=keywords content><meta name=description content="
+VLA 的发展有两条线。
+一条来自机器人领域本身：动作到底应该怎么表示、怎么生成？
+另一条来自大模型：已经非常成功的 Transformer / VLM，能不能直接变成一个通用机器人 policy？
+前一条路线从 Behavior Cloning、Action Chunking 一直走到 Diffusion Policy；后一条路线则从 RT-1、RT-2、OpenVLA 逐渐把 vision、language、action 都塞进统一的 token / autoregressive 范式。
+到 $\pi_0$ 附近，这两条路线又重新汇合：保留 VLM 擅长的视觉语言表示，但不再要求连续机器人动作也必须按照语言 token 的方式输出，而是重新使用面向连续 action chunk 的生成式建模。
+
+
+1. VLA 到底在解决什么问题？
+最简单的机器人 policy 可以写成：
+$$
+(o_t,l)\rightarrow a_t
+$$其中：
+
+$o_t$：当前 observation，例如 RGB 图像、机器人关节状态；
+$l$：语言任务描述；
+$a_t$：当前机器人动作。
+
+如果只看这个公式，VLA 好像只是：
+$$
+\text{Vision}
++
+\text{Language}
+\rightarrow
+\text{Action}
+$$但真正往下拆，会发现至少有两个问题混在一起。
+第一个问题是：
+$$
+\boxed{
+\text{Action 到底应该是什么样的输出对象？}
+}
+$$是一个确定的连续向量？
+是一串未来动作？
+是一个概率分布？
+还是一串离散 token？
+第二个问题是：
+$$
+\boxed{
+\text{如何把大规模视觉语言模型已经学到的知识，变成机器人行为？}
+}
+$$前一个问题在 VLA 出现之前，机器人 imitation learning 领域已经讨论了很久。"><meta name=author content="LetsGetAI"><link rel=canonical href=https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/><link crossorigin=anonymous href=/assets/css/stylesheet.4a7a0536a1692fc4d59bd621cb1b40f180c2fea7796bab2d32e27cfc03deb1b9.css integrity="sha256-SnoFNqFpL8TVm9YhyxtA8YDC/qd5a6stMuJ8/APesbk=" rel="preload stylesheet" as=style><link rel=icon href=https://letsgetai.github.io/favicon.ico><link rel=icon type=image/png sizes=16x16 href=https://letsgetai.github.io/favicon-16x16.png><link rel=icon type=image/png sizes=32x32 href=https://letsgetai.github.io/favicon-32x32.png><link rel=apple-touch-icon href=https://letsgetai.github.io/apple-touch-icon.png><link rel=mask-icon href=https://letsgetai.github.io/safari-pinned-tab.svg><meta name=theme-color content="#2e2e33"><meta name=msapplication-TileColor content="#2e2e33"><link rel=alternate hreflang=en href=https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/><noscript><style>#theme-toggle,.top-link{display:none}</style><style>@media(prefers-color-scheme:dark){:root{--theme:rgb(29, 30, 32);--entry:rgb(46, 46, 51);--primary:rgb(218, 218, 219);--secondary:rgb(155, 156, 157);--tertiary:rgb(65, 66, 68);--content:rgb(196, 196, 197);--code-block-bg:rgb(46, 46, 51);--code-bg:rgb(55, 56, 62);--border:rgb(51, 51, 51);color-scheme:dark}.list{background:var(--theme)}.toc{background:var(--entry)}}</style></noscript><script>localStorage.getItem("pref-theme")==="dark"?document.querySelector("html").dataset.theme="dark":localStorage.getItem("pref-theme")==="light"?document.querySelector("html").dataset.theme="light":window.matchMedia("(prefers-color-scheme: dark)").matches?document.querySelector("html").dataset.theme="dark":document.querySelector("html").dataset.theme="light"</script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css><script defer src=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js></script><script defer src=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js onload='renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:!0},{left:"$",right:"$",display:!1}]})'></script><script src=https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js></script><script>mermaid.initialize({startOnLoad:!0,theme:"default",flowchart:{useMaxWidth:!0}})</script><meta property="og:url" content="https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/"><meta property="og:site_name" content="The Herta"><meta property="og:title" content="VLA：动作建模与通用机器人策略"><meta property="og:description" content="VLA 的发展有两条线。
+一条来自机器人领域本身：动作到底应该怎么表示、怎么生成？
+另一条来自大模型：已经非常成功的 Transformer / VLM，能不能直接变成一个通用机器人 policy？
+前一条路线从 Behavior Cloning、Action Chunking 一直走到 Diffusion Policy；后一条路线则从 RT-1、RT-2、OpenVLA 逐渐把 vision、language、action 都塞进统一的 token / autoregressive 范式。
+到 $\pi_0$ 附近，这两条路线又重新汇合：保留 VLM 擅长的视觉语言表示，但不再要求连续机器人动作也必须按照语言 token 的方式输出，而是重新使用面向连续 action chunk 的生成式建模。
+1. VLA 到底在解决什么问题？ 最简单的机器人 policy 可以写成：
+$$ (o_t,l)\rightarrow a_t $$其中：
+$o_t$：当前 observation，例如 RGB 图像、机器人关节状态； $l$：语言任务描述； $a_t$：当前机器人动作。 如果只看这个公式，VLA 好像只是：
+$$ \text{Vision} + \text{Language} \rightarrow \text{Action} $$但真正往下拆，会发现至少有两个问题混在一起。
+第一个问题是：
+$$ \boxed{ \text{Action 到底应该是什么样的输出对象？} } $$是一个确定的连续向量？
+是一串未来动作？
+是一个概率分布？
+还是一串离散 token？
+第二个问题是：
+$$ \boxed{ \text{如何把大规模视觉语言模型已经学到的知识，变成机器人行为？} } $$前一个问题在 VLA 出现之前，机器人 imitation learning 领域已经讨论了很久。"><meta property="og:locale" content="zh_cn"><meta property="og:type" content="article"><meta property="article:section" content="posts"><meta property="article:published_time" content="2026-10-17T00:00:00+00:00"><meta property="article:modified_time" content="2026-10-17T00:00:00+00:00"><meta name=twitter:card content="summary"><meta name=twitter:title content="VLA：动作建模与通用机器人策略"><meta name=twitter:description content="VLA 的发展有两条线。
+一条来自机器人领域本身：动作到底应该怎么表示、怎么生成？
+另一条来自大模型：已经非常成功的 Transformer / VLM，能不能直接变成一个通用机器人 policy？
+前一条路线从 Behavior Cloning、Action Chunking 一直走到 Diffusion Policy；后一条路线则从 RT-1、RT-2、OpenVLA 逐渐把 vision、language、action 都塞进统一的 token / autoregressive 范式。
+到 $\pi_0$ 附近，这两条路线又重新汇合：保留 VLM 擅长的视觉语言表示，但不再要求连续机器人动作也必须按照语言 token 的方式输出，而是重新使用面向连续 action chunk 的生成式建模。
+1. VLA 到底在解决什么问题？ 最简单的机器人 policy 可以写成：
+$$ (o_t,l)\rightarrow a_t $$其中：
+$o_t$：当前 observation，例如 RGB 图像、机器人关节状态； $l$：语言任务描述； $a_t$：当前机器人动作。 如果只看这个公式，VLA 好像只是：
+$$ \text{Vision} + \text{Language} \rightarrow \text{Action} $$但真正往下拆，会发现至少有两个问题混在一起。
+第一个问题是：
+$$ \boxed{ \text{Action 到底应该是什么样的输出对象？} } $$是一个确定的连续向量？
+是一串未来动作？
+是一个概率分布？
+还是一串离散 token？
+第二个问题是：
+$$ \boxed{ \text{如何把大规模视觉语言模型已经学到的知识，变成机器人行为？} } $$前一个问题在 VLA 出现之前，机器人 imitation learning 领域已经讨论了很久。"><script type=application/ld+json>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Posts","item":"https://letsgetai.github.io/posts/"},{"@type":"ListItem","position":2,"name":"VLA：动作建模与通用机器人策略","item":"https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/"}]}</script><script type=application/ld+json>{"@context":"https://schema.org","@type":"BlogPosting","headline":"VLA：动作建模与通用机器人策略","name":"VLA：动作建模与通用机器人策略","description":" VLA 的发展有两条线。\n一条来自机器人领域本身：动作到底应该怎么表示、怎么生成？\n另一条来自大模型：已经非常成功的 Transformer / VLM，能不能直接变成一个通用机器人 policy？\n前一条路线从 Behavior Cloning、Action Chunking 一直走到 Diffusion Policy；后一条路线则从 RT-1、RT-2、OpenVLA 逐渐把 vision、language、action 都塞进统一的 token / autoregressive 范式。\n到 $\\pi_0$ 附近，这两条路线又重新汇合：保留 VLM 擅长的视觉语言表示，但不再要求连续机器人动作也必须按照语言 token 的方式输出，而是重新使用面向连续 action chunk 的生成式建模。\n1. VLA 到底在解决什么问题？ 最简单的机器人 policy 可以写成：\n$$ (o_t,l)\\rightarrow a_t $$其中：\n$o_t$：当前 observation，例如 RGB 图像、机器人关节状态； $l$：语言任务描述； $a_t$：当前机器人动作。 如果只看这个公式，VLA 好像只是：\n$$ \\text{Vision} + \\text{Language} \\rightarrow \\text{Action} $$但真正往下拆，会发现至少有两个问题混在一起。\n第一个问题是：\n$$ \\boxed{ \\text{Action 到底应该是什么样的输出对象？} } $$是一个确定的连续向量？\n是一串未来动作？\n是一个概率分布？\n还是一串离散 token？\n第二个问题是：\n$$ \\boxed{ \\text{如何把大规模视觉语言模型已经学到的知识，变成机器人行为？} } $$前一个问题在 VLA 出现之前，机器人 imitation learning 领域已经讨论了很久。\n","keywords":[],"articleBody":" VLA 的发展有两条线。\n一条来自机器人领域本身：动作到底应该怎么表示、怎么生成？\n另一条来自大模型：已经非常成功的 Transformer / VLM，能不能直接变成一个通用机器人 policy？\n前一条路线从 Behavior Cloning、Action Chunking 一直走到 Diffusion Policy；后一条路线则从 RT-1、RT-2、OpenVLA 逐渐把 vision、language、action 都塞进统一的 token / autoregressive 范式。\n到 $\\pi_0$ 附近，这两条路线又重新汇合：保留 VLM 擅长的视觉语言表示，但不再要求连续机器人动作也必须按照语言 token 的方式输出，而是重新使用面向连续 action chunk 的生成式建模。\n1. VLA 到底在解决什么问题？ 最简单的机器人 policy 可以写成：\n$$ (o_t,l)\\rightarrow a_t $$其中：\n$o_t$：当前 observation，例如 RGB 图像、机器人关节状态； $l$：语言任务描述； $a_t$：当前机器人动作。 如果只看这个公式，VLA 好像只是：\n$$ \\text{Vision} + \\text{Language} \\rightarrow \\text{Action} $$但真正往下拆，会发现至少有两个问题混在一起。\n第一个问题是：\n$$ \\boxed{ \\text{Action 到底应该是什么样的输出对象？} } $$是一个确定的连续向量？\n是一串未来动作？\n是一个概率分布？\n还是一串离散 token？\n第二个问题是：\n$$ \\boxed{ \\text{如何把大规模视觉语言模型已经学到的知识，变成机器人行为？} } $$前一个问题在 VLA 出现之前，机器人 imitation learning 领域已经讨论了很久。\n后一个问题则是在 Transformer、LLM、VLM scaling 成功之后才变得非常突出。\n因此，与其把 VLA 看成一条简单的：\n$$ \\text{RT-1}\\rightarrow\\text{RT-2}\\rightarrow\\text{OpenVLA}\\rightarrow\\pi_0 $$不如先分开看这两条路线。\nPart I：机器人领域本来就在研究 Action 应该怎么输出 2. Behavior Cloning：最直接的起点 最简单的 Behavior Cloning（BC）就是监督学习，经典实例可参考 ALVINN（Pomerleau, 1989）。\n给一批 expert demonstration：\n$$ \\mathcal D = \\{(o_t,a_t^{expert})\\} $$学习：\n$$ \\pi_\\theta(o_t) \\approx a_t^{expert} $$例如机械臂的 action 可以是：\n$$ a_t= [ \\Delta x, \\Delta y, \\Delta z, \\Delta r_x, \\Delta r_y, \\Delta r_z, g ] $$其中 $g$ 表示夹爪开合。\n如果直接做回归，可以使用类似：\n$$ \\mathcal L = \\|\\pi_\\theta(o_t)-a_t^{expert}\\|^2 $$这样的目标。\n这件事情很直接：\nExpert 在这种 observation 下怎么做，我就学着怎么做。\n但它很快会暴露两个并不相同的问题。\n2.1 第一个问题：训练状态分布和执行状态分布不同 训练数据来自 expert：\n$$ s_t\\sim d_{\\text{expert}} $$但真正执行的时候，未来 observation 是由模型自己的动作决定的：\n$$ a_t\\sim\\pi_\\theta $$$$ s_{t+1}\\sim p(s_{t+1}|s_t,a_t) $$只要某一步产生一点误差，就可能进入 expert demonstration 中很少出现甚至没有出现的状态：\n$$ s_t \\rightarrow a_t^{wrong} \\rightarrow s_{t+1}' $$然后模型在：\n$$ s_{t+1}' $$上又没有足够 supervision，于是可能继续犯错：\n$$ \\text{small error} \\rightarrow \\text{unseen state} \\rightarrow \\text{larger error} $$这就是 imitation learning 里经典的 distribution shift / compounding error 问题。\nDAgger 的思路可以看成一个很直接的修补：\n$$ \\text{让 learner 自己执行} $$然后在 learner 真正访问到的 state 上，请 expert 给出正确动作：\n$$ (s',a^{expert}(s')) $$再把这些数据加回训练集。\n它解决的核心不是“模型结构不够强”，而是：\npolicy 的动作会改变自己未来看到的数据分布，因此 imitation learning 并不是普通的 i.i.d. supervised learning。\n2.2 第二个问题：BC 本身没有长期 return BC 优化的是：\n$$ \\pi_\\theta(o_t) \\approx a_t^{expert} $$它并没有直接优化：\n$$ \\max_\\pi \\mathbb E \\left[ \\sum_t r_t \\right] $$也就是说，训练目标本身没有问：\n当前这个动作，几十步以后到底会让任务变好还是变坏？\n当然，如果 demonstration 足够好、数据足够丰富、模型上下文足够长，policy 完全可能从 demonstration 中隐式地学到长期策略。\n但它的 objective 本身仍然是 imitation，而不是 long-horizon credit assignment。\n所以：\n$$ \\boxed{ \\text{distribution shift} } $$和：\n$$ \\boxed{ \\text{缺少显式长期反馈} } $$是两个不同的问题。\n3. “Action 怎么输出”其实很早就不是只有一个答案 如果同一个 observation 对应唯一动作，那么：\n$$ o\\rightarrow a $$当然很自然。\n但机器人行为经常不是 deterministic mapping。\n例如机械臂面前有一个障碍物，可以：\n$$ A_L=\\text{从左边绕} $$也可以：\n$$ A_R=\\text{从右边绕} $$两个行为都可能成功。\n如果直接使用 MSE regression，最优 point estimate 可能会接近：\n$$ \\hat A \\approx \\frac{A_L+A_R}{2} $$结果反而可能直直撞向障碍物。\n因此在 ACT、Diffusion Policy 之前，机器人 policy 对输出分布的讨论其实已经很多：\nGaussian / Gaussian Mixture Model Mixture Density Network CVAE Autoregressive density model Energy-based policy Normalizing Flow 其他 structured policy representation 所以后面 ACT 和 Diffusion Policy 不应该理解为“之前所有人都只会做单点回归”。\n更准确地说，它们是这条长期问题线中两个非常有代表性的现代方案：\n$$ \\boxed{ \\text{如何表达一个复杂、连续、具有时间结构的机器人动作？} } $$ 4. ACT：把 policy 输出的基本单位从一个动作变成一段动作 ACT（Action Chunking with Transformers）的重要点，不只是“用了 Transformer”。\n它改变了 policy 输出的基本对象。\n原来是：\n$$ o_t\\rightarrow a_t $$ACT 更接近：\n$$ o_t \\rightarrow A_t = [a_t,a_{t+1},\\ldots,a_{t+H-1}] $$也就是说，一次预测一个 action chunk。\n4.1 为什么 Action Chunk 有意义？ 很多机器人动作本身就具有明显的时间结构。\n例如：\n伸手 → 对准杯子 → 闭合夹爪 → 抬起\n如果每一个低层 control step 都重新独立预测：\n$$ o_t\\rightarrow a_t $$$$ o_{t+1}\\rightarrow a_{t+1} $$模型容易受到微小 observation noise 和单步预测误差影响，动作也可能出现 jitter。\n而如果一次预测：\n$$ [a_t,\\ldots,a_{t+H-1}] $$那么模型可以把一段运动整体表示出来。\n它更像一个局部 motion primitive。\n因此 Action Chunking 至少带来两个直觉上的变化：\n$$ \\boxed{ \\text{减少连续单步决策带来的误差积累} } $$以及：\n$$ \\boxed{ \\text{让一段动作具有更强的 temporal coherence} } $$ACT 原论文也正是针对 imitation learning 中 policy error compounding 和 demonstration non-stationarity 等问题提出 action chunking，并将整段 action sequence 作为 generative modeling 对象。\n4.2 但 chunk 并不是越长越好 这里会自然产生一个 trade-off。\n如果 chunk 很短：\n$$ H\\text{ 小} $$机器人会频繁重新观察和修正：\n$$ \\boxed{\\text{closed-loop correction 强}} $$但是动作的整体一致性会弱一些。\n如果 chunk 很长：\n$$ H\\text{ 大} $$则更容易生成完整、连贯的 movement：\n$$ \\boxed{\\text{temporal coherence 强}} $$但如果中途环境发生变化，模型又一直执行旧计划：\n$$ \\boxed{\\text{feedback correction 变弱}} $$所以 Action Chunking 并不是简单地：\n一次预测很多步，然后闭眼执行到底。\nACT 使用 temporal ensembling，把不同时刻预测出来的 overlapping action chunks 进行融合，从而在动作连贯性和在线反馈之间做折中。\n4.3 CVAE 在这里解决什么？ ACT 还用了 CVAE。\n它背后的问题还是：\n$$ o\\rightarrow A $$不是一个严格 deterministic mapping。\n即使同一个任务，人类 demonstration 也可能有不同操作风格：\n$$ A^{(1)},A^{(2)},\\ldots $$CVAE 给模型一个 latent variable：\n$$ z $$于是可以表示：\n$$ p(A|o) = \\int p(A|o,z)p(z|o)\\,dz $$也就是说，ACT 已经不只是单纯的 deterministic action regression。\n5. Diffusion Policy：从“一段动作”进一步走向“动作轨迹的联合分布” ACT 之后，一个更自然的问题是：\n如果 action trajectory 本身是复杂、多模态、高维的连续分布，能不能直接对整个分布做 generative modeling？\nDiffusion Policy 的答案是：\n$$ \\boxed{ p(A|o) } $$其中：\n$$ A= [a_t,a_{t+1},\\ldots,a_{t+H-1}] $$不是单个 action，而是完整的 action trajectory / action chunk。\n5.1 $$ o\\rightarrow A $$和：\n$$ o\\rightarrow p(A|o) $$到底有什么区别？\n第一个更像 point prediction：\n$$ A=f_\\theta(o) $$给定 observation，输出一条确定 trajectory。\n第二个表示：\n给定这个 observation，哪些 trajectory 是合理的？它们的概率结构是什么？\n例如：\n$$ p(A_L|o)\u003e0 $$$$ p(A_R|o)\u003e0 $$左绕和右绕可以同时成为两个 mode。\n因此“加一个 $p$”不是写法上的修饰，而是重新定义 policy 的输出：\n$$ \\boxed{ \\text{从一个答案} \\rightarrow \\text{一整个行为分布} } $$ 5.2 Diffusion 不是沿着机器人时间做 Autoregressive Generation 这里一开始很容易混淆两个时间轴。\n机器人真实时间：\n$$ t,t+1,\\ldots,t+H-1 $$描述的是：\n$$ [a_t,a_{t+1},\\ldots,a_{t+H-1}] $$而 diffusion time 是：\n$$ K,K-1,\\ldots,0 $$描述整条 trajectory 从 noise 逐渐变干净：\n$$ A^K \\rightarrow A^{K-1} \\rightarrow \\cdots \\rightarrow A^0 $$最终：\n$$ A^0 = [a_t,a_{t+1},\\ldots,a_{t+H-1}] $$所以 Diffusion Policy 并不是：\n$$ a_t\\rightarrow a_{t+1}\\rightarrow a_{t+2} $$这样沿 robot time 一个动作接一个动作生成。\n它是在每个 diffusion step 上更新整条 action trajectory。\n5.3 并行生成为什么仍然可以学习前后动作依赖？ 因为：\n$$ \\text{parallel} \\neq \\text{independent} $$denoising network 输入的就是：\n$$ A^k = [a_t^k,\\ldots,a_{t+H-1}^k] $$整段 noisy trajectory。\n它在更新某个：\n$$ a_{t+i} $$时，可以利用整段 trajectory 的信息。\n所以它学习的不是：\n$$ \\prod_i p(a_{t+i}|o) $$而是：\n$$ \\boxed{ p(a_t,a_{t+1},\\ldots,a_{t+H-1}|o) } $$这个 joint distribution。\nDiffusion Policy 原论文也特别强调它对 multimodal action distribution、高维 action space 和训练稳定性的优势，并结合 receding-horizon control 来实际执行生成出来的 action sequence。\n6. 第一条路线到这里可以先收束 从我们现在关注的角度，可以把机器人 action modeling 的变化压成：\n$$ \\boxed{ o_t\\rightarrow a_t } $$↓\n$$ \\boxed{ o_t\\rightarrow a_{t:t+H} } $$↓\n$$ \\boxed{ o_t\\rightarrow p(a_{t:t+H}|o_t) } $$也就是：\n$$ \\text{single action} $$↓\n$$ \\text{temporally structured action chunk} $$↓\n$$ \\text{multimodal joint trajectory distribution} $$这条路线真正一直在回答的是：\n$$ \\boxed{ \\text{一个机器人 policy 的输出空间到底应该如何参数化？} } $$ Part II：大 Transformer / VLM 带来了另一套非常成功的输出范式 7. Transformer 成功以后，一个很自然的想法：Everything as Tokens 语言模型最成功的训练形式之一是：\n$$ p(x_i|x_{\\lt i}) $$即 autoregressive next-token prediction。\n文本天然就是：\n$$ [x_1,x_2,\\ldots,x_n] $$Transformer 可以统一学习：\n$$ p(x_1,\\ldots,x_n) = \\prod_i p(x_i|x_{\\lt i}) $$后来 image、video 等 modality 也大量采用 token 化或者 sequence modeling。\n于是到了机器人这里，一个极其自然的问题就是：\nvision 和 language 都能进入 Transformer，action 能不能也变成 token？\n如果可以，那么：\n$$ \\text{Vision} + \\text{Language} + \\text{Action} $$就可以全部进入一个统一的 sequence model。\n8. RT-1：先把机器人 policy 放进 scaling 范式 RT-1（Robotics Transformer 1）真正重要的问题不是：\n如何更精确地建模一个 action distribution？\n而是：\n$$ \\boxed{ \\text{一个 Transformer 能不能吸收大量不同机器人任务，形成一个多任务 policy？} } $$它输入短时间图像序列和自然语言任务描述：\n$$ (o_{t-k:t},l) $$然后输出 robot action。\n为了让 action 适配 Transformer 的 categorical token prediction，RT-1 对连续 action dimension 进行离散化。\n也就是：\n$$ a\\in\\mathbb R $$经过 quantization：\n$$ a \\rightarrow k\\in\\{1,\\ldots,K\\} $$最后输出：\n$$ \\text{action token} $$RT-1 使用大量真实机器人数据训练一个统一 policy，并展示一个模型覆盖大量真实机器人任务的可行性。\n所以它的历史位置更适合概括为：\n$$ \\boxed{ \\text{task-specific robot policy} \\rightarrow \\text{large-scale multi-task robot policy} } $$它解决的主要是：\n$$ \\boxed{ \\text{robot policy scaling} } $$ 9. RT-2：Robot Data 不够，能不能把 VLM 的 Web Knowledge 直接带进来？ RT-1 的知识来源很大程度仍然是 robot data。\n但 robot data 本身非常昂贵。\n与此同时，VLM 已经通过海量互联网 image-text data 学到了大量：\nobject semantics visual concepts language concepts commonsense relations 所以 RT-2 的问题变成：\n$$ \\boxed{ \\text{VLM 已经学到的知识，能不能直接变成 robot behavior？} } $$ 9.1 把 Action 当成另一种 Token RT-2 的做法非常直接。\nrobot action 原本是连续向量：\n$$ a_t\\in\\mathbb R^d $$把每个 dimension 离散化之后，可以得到：\n$$ [k_1,k_2,\\ldots,k_d] $$这些整数再映射成模型 vocabulary 中的 token。\n于是 VLM 原本做：\n$$ (image,text) \\rightarrow text\\ tokens $$现在可以做：\n$$ (image,instruction) \\rightarrow action\\ tokens $$从网络形式来看，两者都成为：\n$$ \\boxed{ \\text{next-token prediction} } $$这是一个非常强的统一。\n9.2 RT-2 真正带来的变化 它不只是扩大 robot dataset。\n更重要的是把：\n$$ \\boxed{ \\text{Web-scale vision-language knowledge} } $$和：\n$$ \\boxed{ \\text{robot demonstrations} } $$放进同一个模型。\n因此已经在 VLM 里学到的语义关系，有机会直接影响 robot action。\nVLA 在这里开始成为一个比较明确的范式：\n$$ \\boxed{ \\text{Vision} + \\text{Language} + \\text{Action} } $$统一进一个 pretrained multimodal model。\n所以从 RT-1 到 RT-2，更重要的变化是：\n$$ \\boxed{ \\text{multi-task robot policy} \\rightarrow \\text{VLM knowledge transfer to robot control} } $$ 10. OpenVLA：把这套 VLA 范式变成一个开放的研究基础 OpenVLA 的重要性和 RT-2 不完全一样。\n它没有重新发明 Action 应该如何生成。\n在 action output 上，它仍然基本延续：\n$$ \\text{continuous action} \\rightarrow \\text{discretization} \\rightarrow \\text{action tokens} \\rightarrow \\text{autoregressive prediction} $$它更重要的目标是：\n$$ \\boxed{ \\text{让 large VLA 变得开放、可训练、可适配} } $$OpenVLA 是一个 7B VLA，在大规模 Open X-Embodiment 机器人数据上训练，并强调：\nopen-source multi-robot / cross-embodiment parameter-efficient adaptation 对新 robot / task 的 fine-tuning 因此它更像：\n$$ \\boxed{ \\text{把 RT-2-style VLA 做成一个可研究的 foundation policy} } $$ 11. 走到这里，会重新遇到一个很有意思的问题：Action 真的是 Language 吗？ RT-1 / RT-2 / OpenVLA 的设计逻辑其实非常合理。\n因为手里已经有：\n$$ \\boxed{ \\text{一个极其强大的 autoregressive Transformer / VLM} } $$最简单的办法就是把新的 modality 也变成 token。\n于是：\n$$ \\text{continuous robot action} $$被改造成：\n$$ \\text{discrete action tokens} $$整个系统就可以继续复用：\n$$ p(x_i|x_{\\lt i}) $$这个成熟的训练范式。\n但从机器人角度重新看，action 本身具有一些和 language 很不一样的性质：\n$$ \\boxed{ \\text{continuous} } $$$$ \\boxed{ \\text{high-frequency} } $$$$ \\boxed{ \\text{strong temporal correlation} } $$$$ \\boxed{ \\text{potentially multimodal} } $$而自然语言更天然是离散 symbolic sequence。\n所以这里出现了一个值得保留的问题：\nVLA 的早期设计，在一定程度上是不是在让机器人动作适应一个已经非常成功的大模型范式，而不是重新问“机器人动作本身最自然的输出形式是什么”？\n这不意味着 autoregressive action prediction 是错的。\n它完全可以表达：\n$$ p(A|o) = \\prod_i p(a_i|a_{\\lt i},o) $$并且它有非常大的工程优势：\n可以直接复用大模型 architecture； vision / language / action 可以统一表示； next-token training infrastructure 已经非常成熟； sequence likelihood 的定义清晰。 但它带来的 inductive bias 是：\n$$ \\boxed{ \\text{trajectory = sequence of discrete symbols} } $$而 Diffusion / Flow 一类方法则更倾向：\n$$ \\boxed{ \\text{trajectory = one continuous high-dimensional object} } $$这两个视角并不等价。\nPart III：$\\pi_0$ —— 两条路线重新汇合 12. $\\pi_0$ 接受 VLM，但不再要求 Action 服从语言输出接口 $\\pi_0$ 最有意思的地方，不只是“使用了 Flow Matching”。\n更重要的是，它重新划分了系统里不同部分的职责。\n一边仍然保留：\n$$ \\boxed{ \\text{pretrained VLM} } $$负责：\nvisual representation language understanding semantic knowledge task conditioning 另一边加入：\n$$ \\boxed{ \\text{Action Expert} } $$专门负责机器人 continuous action。\n12.1 Action 又重新变回连续 trajectory $\\pi_0$ 不再要求：\n$$ \\text{continuous action} \\rightarrow \\text{256 bins} \\rightarrow \\text{text-like tokens} $$而是直接定义：\n$$ A_t= [a_t,a_{t+1},\\ldots,a_{t+H-1}] $$并建模：\n$$ \\boxed{ p(A_t|o_t) } $$其中 observation 包括：\n$$ o_t= [\\text{images},\\text{language},\\text{proprioception}] $$论文中使用的 action chunk horizon 为：\n$$ H=50 $$然后使用 conditional flow matching 来训练 action generation。\n这在抽象层面与 Diffusion Policy 很接近：\n$$ \\boxed{ \\text{conditional generative modeling of continuous action chunks} } $$区别在于具体 generative formulation 使用的是 flow matching，而不是 Diffusion Policy 原论文中的 diffusion process。\n13. 为什么这可以看成两条路线重新接上？ 在机器人 policy 这边，我们已经走到了：\n$$ \\text{BC} \\rightarrow \\text{ACT} \\rightarrow \\text{Diffusion Policy} $$也就是：\n$$ \\text{single action} \\rightarrow \\text{action chunk} \\rightarrow \\text{continuous multimodal trajectory distribution} $$另一边，大模型路线走到了：\n$$ \\text{Transformer} \\rightarrow \\text{VLM} \\rightarrow \\text{RT-1} \\rightarrow \\text{RT-2} \\rightarrow \\text{OpenVLA} $$也就是：\n$$ \\text{vision} + \\text{language} + \\text{action} \\rightarrow \\text{unified token sequence} $$$\\pi_0$ 做的事情可以理解成：\n$$ \\boxed{ \\text{VLM semantic backbone} + \\text{continuous generative action policy} } $$它保留大模型路线真正有价值的部分：\n$$ \\text{large-scale visual-language knowledge} $$但对 motor output 又重新采用机器人 policy 领域更自然的连续生成方式。\n所以一个比较准确的说法是：\n$\\pi_0$ 并不是证明 autoregressive action generation 是错误的，而是把“VLM 最擅长的表示方式”和“连续机器人控制最自然的表示方式”重新拆开。\n14. 这里其实出现了一个很清楚的职责分工 可以粗略理解成：\nVLM 回答：\n我看到了什么？\n用户让我做什么？\n这些物体之间是什么语义关系？\nAction Expert 回答：\n具体未来几十个低层连续 motor commands 应该怎么运动？\n因此整体变成：\n$$ (\\text{vision},\\text{language},\\text{robot state}) $$↓\n$$ \\text{VLM representation} $$↓\n$$ \\text{Action Expert} $$↓\n$$ A_t=[a_t,\\ldots,a_{t+H-1}] $$这比强行让一个 language decoder 承担所有低层连续运动生成，在表示层面更有针对性。\nPart IV：Action Generation 之后，VLA 暴露出来的问题开始改变 到 $\\pi_0$ 以后，问题已经不再只是：\n$$ \\text{“Action 应该用 AR 还是 Flow？”} $$真正困难的问题逐渐变成：\n$$ \\boxed{ \\text{如何让一个 generalist robot 在复杂环境中长期工作？} } $$Physical Intelligence 后续的 $\\pi$ 系列正好可以看成几个问题的逐步展开。\n15. $\\pi_{0.5}$：从“会很多动作”到 Open-World Generalization $\\pi_0$ 已经能够跨多种 robot embodiment 输出 continuous action。\n但一个 generalist policy 真正困难的是：\n换一个训练时没见过的房子、物体、布局，能不能继续完成任务？\n$\\pi_{0.5}$ 把重点放在：\n$$ \\boxed{ \\text{open-world generalization} } $$这里开始使用更加 heterogeneous 的训练数据和任务形式，不只是低层 robot action，还结合：\nhigh-level semantic prediction subtask-like supervision web multimodal data 多种 robot data 模型开始不只是学习：\n当前手应该移动多少？\n还要理解：\n一个较长任务现在大概处于哪个阶段？\n因此从 $\\pi_0$ 到 $\\pi_{0.5}$，研究重点开始从：\n$$ \\text{motor generation} $$转向：\n$$ \\boxed{ \\text{generalization across environment and task context} } $$ 16. $\\pi^*_{0.6}$：Behavior Cloning 最开始的问题又回来了 如果一直依赖 expert demonstrations，模型看到的仍然主要是：\n$$ d_{\\text{expert}} $$但真正部署之后，机器人会产生自己的：\nsuccess near-success failure recovery situation 所以 BC 最早的那个问题重新出现：\n$$ \\boxed{ \\text{expert data} \\neq \\text{deployment experience} } $$$\\pi^*_{0.6}$ 的重点转向：\n$$ \\boxed{ \\text{Learning from Experience} } $$也就是把：\n$$ \\text{demonstrations} $$和：\n$$ \\text{autonomous robot rollouts} $$以及：\n$$ \\text{human corrections / interventions} $$结合起来，再通过 RL 类方法继续提升 policy。\n这里的范式变化很明显：\n$$ \\boxed{ \\text{Imitation} \\rightarrow \\text{Experience + RL} } $$它开始直接回应 BC 中另一个一直存在的问题：\n仅仅模仿 expert action，不等于根据实际任务结果持续改进 policy。\n17. MEM：Skill 够多以后，瓶颈开始变成“记得住吗？” 当局部 manipulation skill 已经越来越强时，一个很朴素的问题会变得越来越明显：\n任务做了十分钟以后，机器人还知道自己刚才干了什么吗？\n如果任务是：\n整理厨房\n机器人需要知道：\n哪些东西已经收过； 哪一步失败了； 哪些目标还没有完成； 某个物体刚才在哪里； 当前任务进行到了哪个阶段。 你不可能无限制地把过去所有 raw RGB frame 都塞给 Transformer。\nMulti-Scale Embodied Memory（MEM） 于是明确引入：\n$$ \\boxed{ \\text{short-term visual memory} + \\text{long-term semantic memory} } $$短期保留高分辨率、细粒度近期状态；\n长期把过去压缩成更抽象的 semantic / episodic information。\n到这里，VLA 的研究问题已经明显从：\n$$ (o_t,l)\\rightarrow A_t $$开始走向：\n$$ \\boxed{ \\text{partial observability} + \\text{progress tracking} + \\text{long-horizon memory} } $$ 18. $\\pi_{0.7}$：Subgoal、Steerability 和 World Model 开始进入 VLA $\\pi_{0.7}$ 又进一步把问题变成：\n一个 generalist model 能不能组合已有 skill，在新环境中按照不同策略完成新任务？\n它开始使用更加丰富的 prompt / context，包括：\ntask instruction subtask information episode metadata behavior quality / style information visual subgoal 也就是说，模型条件不只是：\n$$ \\text{“做什么”} $$还包括：\n$$ \\boxed{ \\text{“应该以什么方式做”} } $$这就是 steerability 的一部分。\n18.1 World Model 又重新出现 这里有一个对我们后续阅读很重要的点。\n$\\pi_{0.7}$ 可以使用 world model 生成 visual subgoal：\n$$ (o_t,l_{\\text{subtask}}) \\rightarrow \\hat o_{\\text{subgoal}} $$然后 VLA 根据：\n$$ (o_t,\\hat o_{\\text{subgoal}},l) $$生成动作。\n这和 PlaNet / Dreamer 那种：\n$$ (s_t,a_t)\\rightarrow s_{t+1} $$再利用想象出的未来轨迹进行在线规划（PlaNet）或学习策略（Dreamer）的 forward-dynamics world model 不完全一样。\n这里的 world model 更接近：\n$$ \\boxed{ \\text{预测“下一阶段世界应该长什么样”} } $$然后 VLA 解决：\n$$ (o_{\\text{current}},o_{\\text{subgoal}}) \\rightarrow A $$这已经有一点 inverse-dynamics 的味道。\n因此 world model 在现代 VLA 体系中，并不一定非要作为一个：\n$$ \\text{candidate action simulator} $$它也可以作为：\n$$ \\boxed{ \\text{subgoal generator / future-state proposer} } $$出现。\n19. 到这里，VLA 的问题已经发生了明显变化 最开始关心的是：\n$$ \\boxed{ \\text{机器人动作怎么预测？} } $$于是有：\n$$ \\text{BC} \\rightarrow \\text{ACT} \\rightarrow \\text{Diffusion Policy} $$后来大模型路线关心：\n$$ \\boxed{ \\text{一个 policy 怎么获得更多任务和知识？} } $$于是有：\n$$ \\text{RT-1} \\rightarrow \\text{RT-2} \\rightarrow \\text{OpenVLA} $$然后两者在：\n$$ \\boxed{ \\pi_0 } $$附近重新汇合：\n$$ \\text{VLM semantics} + \\text{continuous generative motor policy} $$再往后，问题开始变成：\n$$ \\text{open-world generalization} $$$$ \\text{learning from experience} $$$$ \\text{memory} $$$$ \\text{subtask} $$$$ \\text{world model} $$$$ \\text{skill composition} $$也就是说：\n$$ \\boxed{ \\text{VLA 正在从“动作生成模型”逐渐变成更完整的 embodied agent} } $$ 20. 回头看，两条路线最有意思的交叉点是什么？ 目前我觉得最值得记录的是：\n第一条线：机器人 Action Modeling $$ \\boxed{ o\\rightarrow a } $$↓\n$$ \\boxed{ o\\rightarrow A } $$↓\n$$ \\boxed{ o\\rightarrow p(A|o) } $$这条线不断问：\n什么样的 output representation 才适合真实机器人运动？\n第二条线：Foundation Model / VLA $$ \\boxed{ \\text{multi-task robot Transformer} } $$↓\n$$ \\boxed{ \\text{VLM knowledge transfer} } $$↓\n$$ \\boxed{ \\text{Everything-as-Token} } $$它不断问：\n能不能把已有的大模型 scaling 能力迁移到机器人？\n最后两者重新汇合 $$ \\boxed{ \\text{VLM} + \\text{continuous generative action model} } $$从这个角度看，$\\pi_0$ 的意义并不只是：\nflow matching 比 autoregressive 更先进。\n真正有意思的是：\n$$ \\boxed{ \\text{系统开始重新尊重不同 modality 本身的结构差异} } $$Vision / language 可以继续从 VLM 获得强大的 pretrained representation。\nMotor control 则不必为了“统一”而强行变成 text-like token sequence。\n21. 这里还没有解决的问题 到这里暂时不需要下结论说哪一种 VLA architecture 最终会赢。\n反而有几个问题值得留着，后面进入 long-horizon 再回来判断。\nAction Chunk 到底解决了多少 Long-Horizon？ Action chunk 可以把：\n$$ 1000\\text{ 个低层 control steps} $$压成：\n$$ 20\\text{ 个局部 chunks} $$但这仍然不等于：\n$$ \\boxed{ \\text{task-level long-horizon reasoning} } $$它主要解决的是局部 temporal coherence。\nVLA 是否真的具有 Planning？ 大规模 demonstration 当然可能让模型参数里吸收很多 planning pattern。\n所以 VLA 并不一定表现得“完全没有规划能力”。\n但：\n$$ (o,l)\\rightarrow A $$和：\n$$ \\text{candidate actions} \\rightarrow \\text{future rollout} \\rightarrow \\text{evaluation} \\rightarrow \\text{selection} $$仍然是两种不同机制。\n一个是 amortized behavior。\n另一个是 explicit look-ahead。\nGenerative Action Policy 解决的不是 Task-Level Uncertainty Diffusion / Flow 可以很好地处理：\n$$ p(A|o) $$中的 motor multimodality。\n但如果真正的不确定性是：\n我现在到底应该先收盘子，还是先关冰箱？\n那么这已经不是简单的 low-level action distribution 问题。\n它需要：\ntask state memory progress subgoal planning 等更高层表示。\nMemory / Planning / World Model 最终会不会都被一个大模型吸收？ 现在还不好下结论。\n一种路线是模块化：\n$$ \\text{VLA} + \\text{Memory} + \\text{Planner} + \\text{World Model} $$另一种路线可能希望：\n$$ \\boxed{ \\text{一个更大的 sequence / multimodal model} } $$把这些功能逐渐隐式吸收。\n目前 $\\pi_{0.7}$ 这类工作反而说明，至少在当前阶段，显式提供：\nmetadata memory visual subgoal world model context 依然有实际价值。\n22. 暂时的理解 现在回头看，VLA 的发展不能只概括成：\n$$ \\text{模型变大} $$或者：\n$$ \\text{数据变多} $$至少有两条非常清楚的问题线。\n第一条是：\n$$ \\boxed{ \\text{机器人动作应该怎么表示和生成？} } $$从单步 regression，到 action chunk，再到 multimodal continuous trajectory generation。\n第二条是：\n$$ \\boxed{ \\text{如何把 Foundation Model 的 scaling 和世界知识带进机器人？} } $$从 multi-task Transformer，到 VLM knowledge transfer，再到 cross-embodiment VLA。\n这两条路线一度通过：\n$$ \\boxed{ \\text{action tokenization + autoregressive prediction} } $$被统一到同一个大模型范式。\n然后到了 $\\pi_0$ 一类模型，又开始重新拆分：\n$$ \\boxed{ \\text{语义继续使用 VLM 擅长的表示， 连续控制使用机器人 policy 更自然的生成方式。} } $$而在动作输出逐渐成熟以后，真正困难的问题又继续向外扩：\n$$ \\text{generalization} \\rightarrow \\text{experience learning} \\rightarrow \\text{memory} \\rightarrow \\text{subgoal} \\rightarrow \\text{world model} \\rightarrow \\text{long-horizon} $$所以目前比较自然的下一问已经不是：\n下一个更大的 VLA 是什么？\n而是：\n$$ \\boxed{ \\text{一个通用 VLA 要真正变成长期工作的 embodied agent， 还缺哪些机制？} } $$这也是后面继续看 Long-Horizon、Memory、Planning 和 World Model × VLA 时，需要重新回来的问题。\n参考论文 Ross, S., Gordon, G., \u0026 Bagnell, D. A Reduction of Imitation Learning and Structured Prediction to No-Regret Online Learning (DAgger). AISTATS, 2011. Zhao, T. Z., Kumar, V., Levine, S., \u0026 Finn, C. Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware (ACT / ALOHA). RSS, 2023. Chi, C., et al. Diffusion Policy: Visuomotor Policy Learning via Action Diffusion. RSS, 2023. Brohan, A., et al. RT-1: Robotics Transformer for Real-World Control at Scale. 2022. Brohan, A., et al. RT-2: Vision-Language-Action Models Transfer Web Knowledge to Robotic Control. 2023. Kim, M. J., et al. OpenVLA: An Open-Source Vision-Language-Action Model. 2024. Black, K., et al. $\\pi_0$: A Vision-Language-Action Flow Model for General Robot Control. Physical Intelligence, 2024. Physical Intelligence. $\\pi_{0.5}$: A Vision-Language-Action Model with Open-World Generalization. 2025. Physical Intelligence. $\\pi^*_{0.6}$: A VLA that Learns from Experience. 2025. Physical Intelligence. MEM: Multi-Scale Embodied Memory for Vision Language Action Models. 2026. Physical Intelligence. $\\pi_{0.7}$: A Steerable Generalist Robotic Foundation Model with Emergent Capabilities. 2026. ","wordCount":"2314","inLanguage":"en","datePublished":"2026-10-17T00:00:00Z","dateModified":"2026-10-17T00:00:00Z","author":{"@type":"Person","name":"LetsGetAI"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/"},"publisher":{"@type":"Organization","name":"The Herta","logo":{"@type":"ImageObject","url":"https://letsgetai.github.io/favicon.ico"}}}</script></head><body id=top><header class=header><nav class=header-nav><div class=logo><a href=https://letsgetai.github.io/ accesskey=h title="The Herta (Alt + H)">The Herta</a><div class=logo-switches><button id=theme-toggle class=theme-toggle accesskey=t title="(Alt + T)" aria-label="Toggle theme">
+<svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+<svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button></div></div><ul id=menu class=menu><li><a href=https://letsgetai.github.io/ title=首页><span>首页</span></a></li><li><a href=https://letsgetai.github.io/archives/ title=归档><span>归档</span></a></li><li><a href=https://letsgetai.github.io/about/ title=关于><span>关于</span></a></li><li><a href=https://letsgetai.github.io/categories/ title=分类><span>分类</span></a></li><li><a href=https://github.com/letsgetai title=GitHub><span>GitHub</span>&nbsp;
+<svg fill="none" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" height="12" width="12"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a></li></ul></nav></header><main class=main><article class=post-single><header class=post-header><nav class=breadcrumbs role=navigation aria-label=Breadcrumb><a href=/>主页</a>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"/></svg>
+<a href=/posts/>Posts</a>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"/></svg></nav><h1 class="post-title entry-hint-parent">VLA：动作建模与通用机器人策略</h1><div class=post-meta><span title='2026-10-17 00:00:00 +0000 UTC'>2026-10-17</span>&nbsp;·&nbsp;<span>11 分钟</span>&nbsp;·&nbsp;<span>2314 字</span>&nbsp;·&nbsp;<span>LetsGetAI</span></div></header><div class="post-content md-content"><blockquote><p>VLA 的发展有两条线。</p><p>一条来自机器人领域本身：<strong>动作到底应该怎么表示、怎么生成？</strong></p><p>另一条来自大模型：<strong>已经非常成功的 <a href=https://arxiv.org/abs/1706.03762>Transformer</a> / VLM，能不能直接变成一个通用机器人 policy？</strong></p><p>前一条路线从 <a href=https://publications.ri.cmu.edu/alvinn-an-autonomous-land-vehicle-in-a-neural-network>Behavior Cloning</a>、<a href=https://arxiv.org/abs/2304.13705>Action Chunking</a> 一直走到 <a href=https://arxiv.org/abs/2303.04137>Diffusion Policy</a>；后一条路线则从 <a href=https://arxiv.org/abs/2212.06817>RT-1</a>、<a href=https://arxiv.org/abs/2307.15818>RT-2</a>、<a href=https://arxiv.org/abs/2406.09246>OpenVLA</a> 逐渐把 vision、language、action 都塞进统一的 token / autoregressive 范式。</p><p>到 <a href=https://arxiv.org/abs/2410.24164>$\pi_0$</a> 附近，这两条路线又重新汇合：保留 VLM 擅长的视觉语言表示，但不再要求连续机器人动作也必须按照语言 token 的方式输出，而是重新使用面向连续 action chunk 的生成式建模。</p></blockquote><hr><h2 id=1-vla-到底在解决什么问题>1. VLA 到底在解决什么问题？<a hidden class=anchor aria-hidden=true href=#1-vla-到底在解决什么问题>#</a></h2><p>最简单的机器人 policy 可以写成：</p>$$
+(o_t,l)\rightarrow a_t
+$$<p>其中：</p><ul><li>$o_t$：当前 observation，例如 RGB 图像、机器人关节状态；</li><li>$l$：语言任务描述；</li><li>$a_t$：当前机器人动作。</li></ul><p>如果只看这个公式，VLA 好像只是：</p>$$
+\text{Vision}
++
+\text{Language}
+\rightarrow
+\text{Action}
+$$<p>但真正往下拆，会发现至少有两个问题混在一起。</p><p>第一个问题是：</p>$$
+\boxed{
+\text{Action 到底应该是什么样的输出对象？}
+}
+$$<p>是一个确定的连续向量？</p><p>是一串未来动作？</p><p>是一个概率分布？</p><p>还是一串离散 token？</p><p>第二个问题是：</p>$$
+\boxed{
+\text{如何把大规模视觉语言模型已经学到的知识，变成机器人行为？}
+}
+$$<p>前一个问题在 VLA 出现之前，机器人 imitation learning 领域已经讨论了很久。</p><p>后一个问题则是在 Transformer、LLM、VLM scaling 成功之后才变得非常突出。</p><p>因此，与其把 VLA 看成一条简单的：</p>$$
+\text{RT-1}\rightarrow\text{RT-2}\rightarrow\text{OpenVLA}\rightarrow\pi_0
+$$<p>不如先分开看这两条路线。</p><hr><h2 id=part-i机器人领域本来就在研究-action-应该怎么输出>Part I：机器人领域本来就在研究 Action 应该怎么输出<a hidden class=anchor aria-hidden=true href=#part-i机器人领域本来就在研究-action-应该怎么输出>#</a></h2><h2 id=2-behavior-cloning最直接的起点>2. Behavior Cloning：最直接的起点<a hidden class=anchor aria-hidden=true href=#2-behavior-cloning最直接的起点>#</a></h2><p>最简单的 Behavior Cloning（BC）就是监督学习，经典实例可参考 <a href=https://publications.ri.cmu.edu/alvinn-an-autonomous-land-vehicle-in-a-neural-network>ALVINN（Pomerleau, 1989）</a>。</p><p>给一批 expert demonstration：</p>$$
+\mathcal D =
+\{(o_t,a_t^{expert})\}
+$$<p>学习：</p>$$
+\pi_\theta(o_t)
+\approx
+a_t^{expert}
+$$<p>例如机械臂的 action 可以是：</p>$$
+a_t=
+[
+\Delta x,
+\Delta y,
+\Delta z,
+\Delta r_x,
+\Delta r_y,
+\Delta r_z,
+g
+]
+$$<p>其中 $g$ 表示夹爪开合。</p><p>如果直接做回归，可以使用类似：</p>$$
+\mathcal L =
+\|\pi_\theta(o_t)-a_t^{expert}\|^2
+$$<p>这样的目标。</p><p>这件事情很直接：</p><blockquote><p>Expert 在这种 observation 下怎么做，我就学着怎么做。</p></blockquote><p>但它很快会暴露两个并不相同的问题。</p><hr><h3 id=21-第一个问题训练状态分布和执行状态分布不同>2.1 第一个问题：训练状态分布和执行状态分布不同<a hidden class=anchor aria-hidden=true href=#21-第一个问题训练状态分布和执行状态分布不同>#</a></h3><p>训练数据来自 expert：</p>$$
+s_t\sim d_{\text{expert}}
+$$<p>但真正执行的时候，未来 observation 是由模型自己的动作决定的：</p>$$
+a_t\sim\pi_\theta
+$$$$
+s_{t+1}\sim p(s_{t+1}|s_t,a_t)
+$$<p>只要某一步产生一点误差，就可能进入 expert demonstration 中很少出现甚至没有出现的状态：</p>$$
+s_t
+\rightarrow
+a_t^{wrong}
+\rightarrow
+s_{t+1}'
+$$<p>然后模型在：</p>$$
+s_{t+1}'
+$$<p>上又没有足够 supervision，于是可能继续犯错：</p>$$
+\text{small error}
+\rightarrow
+\text{unseen state}
+\rightarrow
+\text{larger error}
+$$<p>这就是 imitation learning 里经典的 distribution shift / compounding error 问题。</p><p><a href=https://proceedings.mlr.press/v15/ross11a.html>DAgger</a> 的思路可以看成一个很直接的修补：</p>$$
+\text{让 learner 自己执行}
+$$<p>然后在 learner 真正访问到的 state 上，请 expert 给出正确动作：</p>$$
+(s',a^{expert}(s'))
+$$<p>再把这些数据加回训练集。</p><p>它解决的核心不是“模型结构不够强”，而是：</p><blockquote><p>policy 的动作会改变自己未来看到的数据分布，因此 imitation learning 并不是普通的 i.i.d. supervised learning。</p></blockquote><hr><h3 id=22-第二个问题bc-本身没有长期-return>2.2 第二个问题：BC 本身没有长期 return<a hidden class=anchor aria-hidden=true href=#22-第二个问题bc-本身没有长期-return>#</a></h3><p>BC 优化的是：</p>$$
+\pi_\theta(o_t)
+\approx
+a_t^{expert}
+$$<p>它并没有直接优化：</p>$$
+\max_\pi
+\mathbb E
+\left[
+\sum_t r_t
+\right]
+$$<p>也就是说，训练目标本身没有问：</p><blockquote><p>当前这个动作，几十步以后到底会让任务变好还是变坏？</p></blockquote><p>当然，如果 demonstration 足够好、数据足够丰富、模型上下文足够长，policy 完全可能从 demonstration 中<strong>隐式地学到</strong>长期策略。</p><p>但它的 objective 本身仍然是 imitation，而不是 long-horizon credit assignment。</p><p>所以：</p>$$
+\boxed{
+\text{distribution shift}
+}
+$$<p>和：</p>$$
+\boxed{
+\text{缺少显式长期反馈}
+}
+$$<p>是两个不同的问题。</p><hr><h2 id=3-action-怎么输出其实很早就不是只有一个答案>3. “Action 怎么输出”其实很早就不是只有一个答案<a hidden class=anchor aria-hidden=true href=#3-action-怎么输出其实很早就不是只有一个答案>#</a></h2><p>如果同一个 observation 对应唯一动作，那么：</p>$$
+o\rightarrow a
+$$<p>当然很自然。</p><p>但机器人行为经常不是 deterministic mapping。</p><p>例如机械臂面前有一个障碍物，可以：</p>$$
+A_L=\text{从左边绕}
+$$<p>也可以：</p>$$
+A_R=\text{从右边绕}
+$$<p>两个行为都可能成功。</p><p>如果直接使用 MSE regression，最优 point estimate 可能会接近：</p>$$
+\hat A
+\approx
+\frac{A_L+A_R}{2}
+$$<p>结果反而可能直直撞向障碍物。</p><p>因此在 <a href=https://arxiv.org/abs/2304.13705>ACT</a>、<a href=https://arxiv.org/abs/2303.04137>Diffusion Policy</a> 之前，机器人 policy 对输出分布的讨论其实已经很多：</p><ul><li>Gaussian / Gaussian Mixture Model</li><li>Mixture Density Network</li><li><a href=https://proceedings.neurips.cc/paper/2015/hash/8d55a249e6baa5c06772297520da2051-Abstract.html>CVAE</a></li><li>Autoregressive density model</li><li>Energy-based policy</li><li>Normalizing Flow</li><li>其他 structured policy representation</li></ul><p>所以后面 ACT 和 Diffusion Policy 不应该理解为“之前所有人都只会做单点回归”。</p><p>更准确地说，它们是这条长期问题线中两个非常有代表性的现代方案：</p>$$
+\boxed{
+\text{如何表达一个复杂、连续、具有时间结构的机器人动作？}
+}
+$$<hr><h2 id=4-act把-policy-输出的基本单位从一个动作变成一段动作>4. ACT：把 policy 输出的基本单位从一个动作变成一段动作<a hidden class=anchor aria-hidden=true href=#4-act把-policy-输出的基本单位从一个动作变成一段动作>#</a></h2><p><a href=https://arxiv.org/abs/2304.13705>ACT（Action Chunking with Transformers）</a>的重要点，不只是“用了 Transformer”。</p><p>它改变了 policy 输出的基本对象。</p><p>原来是：</p>$$
+o_t\rightarrow a_t
+$$<p>ACT 更接近：</p>$$
+o_t
+\rightarrow
+A_t =
+[a_t,a_{t+1},\ldots,a_{t+H-1}]
+$$<p>也就是说，一次预测一个 action chunk。</p><hr><h3 id=41-为什么-action-chunk-有意义>4.1 为什么 Action Chunk 有意义？<a hidden class=anchor aria-hidden=true href=#41-为什么-action-chunk-有意义>#</a></h3><p>很多机器人动作本身就具有明显的时间结构。</p><p>例如：</p><blockquote><p>伸手 → 对准杯子 → 闭合夹爪 → 抬起</p></blockquote><p>如果每一个低层 control step 都重新独立预测：</p>$$
+o_t\rightarrow a_t
+$$$$
+o_{t+1}\rightarrow a_{t+1}
+$$<p>模型容易受到微小 observation noise 和单步预测误差影响，动作也可能出现 jitter。</p><p>而如果一次预测：</p>$$
+[a_t,\ldots,a_{t+H-1}]
+$$<p>那么模型可以把一段运动整体表示出来。</p><p>它更像一个局部 motion primitive。</p><p>因此 Action Chunking 至少带来两个直觉上的变化：</p>$$
+\boxed{
+\text{减少连续单步决策带来的误差积累}
+}
+$$<p>以及：</p>$$
+\boxed{
+\text{让一段动作具有更强的 temporal coherence}
+}
+$$<p>ACT 原论文也正是针对 imitation learning 中 policy error compounding 和 demonstration non-stationarity 等问题提出 action chunking，并将整段 action sequence 作为 generative modeling 对象。</p><hr><h3 id=42-但-chunk-并不是越长越好>4.2 但 chunk 并不是越长越好<a hidden class=anchor aria-hidden=true href=#42-但-chunk-并不是越长越好>#</a></h3><p>这里会自然产生一个 trade-off。</p><p>如果 chunk 很短：</p>$$
+H\text{ 小}
+$$<p>机器人会频繁重新观察和修正：</p>$$
+\boxed{\text{closed-loop correction 强}}
+$$<p>但是动作的整体一致性会弱一些。</p><p>如果 chunk 很长：</p>$$
+H\text{ 大}
+$$<p>则更容易生成完整、连贯的 movement：</p>$$
+\boxed{\text{temporal coherence 强}}
+$$<p>但如果中途环境发生变化，模型又一直执行旧计划：</p>$$
+\boxed{\text{feedback correction 变弱}}
+$$<p>所以 Action Chunking 并不是简单地：</p><blockquote><p>一次预测很多步，然后闭眼执行到底。</p></blockquote><p>ACT 使用 temporal ensembling，把不同时刻预测出来的 overlapping action chunks 进行融合，从而在动作连贯性和在线反馈之间做折中。</p><hr><h3 id=43-cvae-在这里解决什么>4.3 CVAE 在这里解决什么？<a hidden class=anchor aria-hidden=true href=#43-cvae-在这里解决什么>#</a></h3><p>ACT 还用了 <a href=https://proceedings.neurips.cc/paper/2015/hash/8d55a249e6baa5c06772297520da2051-Abstract.html>CVAE</a>。</p><p>它背后的问题还是：</p>$$
+o\rightarrow A
+$$<p>不是一个严格 deterministic mapping。</p><p>即使同一个任务，人类 demonstration 也可能有不同操作风格：</p>$$
+A^{(1)},A^{(2)},\ldots
+$$<p>CVAE 给模型一个 latent variable：</p>$$
+z
+$$<p>于是可以表示：</p>$$
+p(A|o) =
+\int p(A|o,z)p(z|o)\,dz
+$$<p>也就是说，ACT 已经不只是单纯的 deterministic action regression。</p><hr><h2 id=5-diffusion-policy从一段动作进一步走向动作轨迹的联合分布>5. Diffusion Policy：从“一段动作”进一步走向“动作轨迹的联合分布”<a hidden class=anchor aria-hidden=true href=#5-diffusion-policy从一段动作进一步走向动作轨迹的联合分布>#</a></h2><p>ACT 之后，一个更自然的问题是：</p><blockquote><p>如果 action trajectory 本身是复杂、多模态、高维的连续分布，能不能直接对整个分布做 generative modeling？</p></blockquote><p><a href=https://arxiv.org/abs/2303.04137>Diffusion Policy</a> 的答案是：</p>$$
+\boxed{
+p(A|o)
+}
+$$<p>其中：</p>$$
+A=
+[a_t,a_{t+1},\ldots,a_{t+H-1}]
+$$<p>不是单个 action，而是完整的 action trajectory / action chunk。</p><hr><h3 id=51>5.1<a hidden class=anchor aria-hidden=true href=#51>#</a></h3>$$
+o\rightarrow A
+$$<p>和：</p>$$
+o\rightarrow p(A|o)
+$$<p>到底有什么区别？</p><p>第一个更像 point prediction：</p>$$
+A=f_\theta(o)
+$$<p>给定 observation，输出一条确定 trajectory。</p><p>第二个表示：</p><blockquote><p>给定这个 observation，哪些 trajectory 是合理的？它们的概率结构是什么？</p></blockquote><p>例如：</p>$$
+p(A_L|o)>0
+$$$$
+p(A_R|o)>0
+$$<p>左绕和右绕可以同时成为两个 mode。</p><p>因此“加一个 $p$”不是写法上的修饰，而是重新定义 policy 的输出：</p>$$
+\boxed{
+\text{从一个答案}
+\rightarrow
+\text{一整个行为分布}
+}
+$$<hr><h3 id=52-diffusion-不是沿着机器人时间做-autoregressive-generation>5.2 Diffusion 不是沿着机器人时间做 Autoregressive Generation<a hidden class=anchor aria-hidden=true href=#52-diffusion-不是沿着机器人时间做-autoregressive-generation>#</a></h3><p>这里一开始很容易混淆两个时间轴。</p><p>机器人真实时间：</p>$$
+t,t+1,\ldots,t+H-1
+$$<p>描述的是：</p>$$
+[a_t,a_{t+1},\ldots,a_{t+H-1}]
+$$<p>而 diffusion time 是：</p>$$
+K,K-1,\ldots,0
+$$<p>描述整条 trajectory 从 noise 逐渐变干净：</p>$$
+A^K
+\rightarrow
+A^{K-1}
+\rightarrow
+\cdots
+\rightarrow
+A^0
+$$<p>最终：</p>$$
+A^0 =
+[a_t,a_{t+1},\ldots,a_{t+H-1}]
+$$<p>所以 Diffusion Policy 并不是：</p>$$
+a_t\rightarrow a_{t+1}\rightarrow a_{t+2}
+$$<p>这样沿 robot time 一个动作接一个动作生成。</p><p>它是在每个 diffusion step 上更新<strong>整条</strong> action trajectory。</p><hr><h3 id=53-并行生成为什么仍然可以学习前后动作依赖>5.3 并行生成为什么仍然可以学习前后动作依赖？<a hidden class=anchor aria-hidden=true href=#53-并行生成为什么仍然可以学习前后动作依赖>#</a></h3><p>因为：</p>$$
+\text{parallel}
+\neq
+\text{independent}
+$$<p>denoising network 输入的就是：</p>$$
+A^k =
+[a_t^k,\ldots,a_{t+H-1}^k]
+$$<p>整段 noisy trajectory。</p><p>它在更新某个：</p>$$
+a_{t+i}
+$$<p>时，可以利用整段 trajectory 的信息。</p><p>所以它学习的不是：</p>$$
+\prod_i p(a_{t+i}|o)
+$$<p>而是：</p>$$
+\boxed{
+p(a_t,a_{t+1},\ldots,a_{t+H-1}|o)
+}
+$$<p>这个 joint distribution。</p><p>Diffusion Policy 原论文也特别强调它对 multimodal action distribution、高维 action space 和训练稳定性的优势，并结合 receding-horizon control 来实际执行生成出来的 action sequence。</p><hr><h2 id=6-第一条路线到这里可以先收束>6. 第一条路线到这里可以先收束<a hidden class=anchor aria-hidden=true href=#6-第一条路线到这里可以先收束>#</a></h2><p>从我们现在关注的角度，可以把机器人 action modeling 的变化压成：</p>$$
+\boxed{
+o_t\rightarrow a_t
+}
+$$<p>↓</p>$$
+\boxed{
+o_t\rightarrow a_{t:t+H}
+}
+$$<p>↓</p>$$
+\boxed{
+o_t\rightarrow p(a_{t:t+H}|o_t)
+}
+$$<p>也就是：</p>$$
+\text{single action}
+$$<p>↓</p>$$
+\text{temporally structured action chunk}
+$$<p>↓</p>$$
+\text{multimodal joint trajectory distribution}
+$$<p>这条路线真正一直在回答的是：</p>$$
+\boxed{
+\text{一个机器人 policy 的输出空间到底应该如何参数化？}
+}
+$$<hr><h2 id=part-ii大-transformer--vlm-带来了另一套非常成功的输出范式>Part II：大 Transformer / VLM 带来了另一套非常成功的输出范式<a hidden class=anchor aria-hidden=true href=#part-ii大-transformer--vlm-带来了另一套非常成功的输出范式>#</a></h2><h2 id=7-transformer-成功以后一个很自然的想法everything-as-tokens>7. Transformer 成功以后，一个很自然的想法：Everything as Tokens<a hidden class=anchor aria-hidden=true href=#7-transformer-成功以后一个很自然的想法everything-as-tokens>#</a></h2><p>语言模型最成功的训练形式之一是：</p>$$
+p(x_i|x_{\lt i})
+$$<p>即 autoregressive next-token prediction。</p><p>文本天然就是：</p>$$
+[x_1,x_2,\ldots,x_n]
+$$<p>Transformer 可以统一学习：</p>$$
+p(x_1,\ldots,x_n) =
+\prod_i p(x_i|x_{\lt i})
+$$<p>后来 image、video 等 modality 也大量采用 token 化或者 sequence modeling。</p><p>于是到了机器人这里，一个极其自然的问题就是：</p><blockquote><p>vision 和 language 都能进入 Transformer，action 能不能也变成 token？</p></blockquote><p>如果可以，那么：</p>$$
+\text{Vision}
++
+\text{Language}
++
+\text{Action}
+$$<p>就可以全部进入一个统一的 sequence model。</p><hr><h2 id=8-rt-1先把机器人-policy-放进-scaling-范式>8. RT-1：先把机器人 policy 放进 scaling 范式<a hidden class=anchor aria-hidden=true href=#8-rt-1先把机器人-policy-放进-scaling-范式>#</a></h2><p><a href=https://arxiv.org/abs/2212.06817>RT-1（Robotics Transformer 1）</a>真正重要的问题不是：</p><blockquote><p>如何更精确地建模一个 action distribution？</p></blockquote><p>而是：</p>$$
+\boxed{
+\text{一个 Transformer 能不能吸收大量不同机器人任务，形成一个多任务 policy？}
+}
+$$<p>它输入短时间图像序列和自然语言任务描述：</p>$$
+(o_{t-k:t},l)
+$$<p>然后输出 robot action。</p><p>为了让 action 适配 Transformer 的 categorical token prediction，RT-1 对连续 action dimension 进行离散化。</p><p>也就是：</p>$$
+a\in\mathbb R
+$$<p>经过 quantization：</p>$$
+a
+\rightarrow
+k\in\{1,\ldots,K\}
+$$<p>最后输出：</p>$$
+\text{action token}
+$$<p>RT-1 使用大量真实机器人数据训练一个统一 policy，并展示一个模型覆盖大量真实机器人任务的可行性。</p><p>所以它的历史位置更适合概括为：</p>$$
+\boxed{
+\text{task-specific robot policy}
+\rightarrow
+\text{large-scale multi-task robot policy}
+}
+$$<p>它解决的主要是：</p>$$
+\boxed{
+\text{robot policy scaling}
+}
+$$<hr><h2 id=9-rt-2robot-data-不够能不能把-vlm-的-web-knowledge-直接带进来>9. RT-2：Robot Data 不够，能不能把 VLM 的 Web Knowledge 直接带进来？<a hidden class=anchor aria-hidden=true href=#9-rt-2robot-data-不够能不能把-vlm-的-web-knowledge-直接带进来>#</a></h2><p>RT-1 的知识来源很大程度仍然是 robot data。</p><p>但 robot data 本身非常昂贵。</p><p>与此同时，VLM 已经通过海量互联网 image-text data 学到了大量：</p><ul><li>object semantics</li><li>visual concepts</li><li>language concepts</li><li>commonsense relations</li></ul><p>所以 <a href=https://arxiv.org/abs/2307.15818>RT-2</a> 的问题变成：</p>$$
+\boxed{
+\text{VLM 已经学到的知识，能不能直接变成 robot behavior？}
+}
+$$<hr><h3 id=91-把-action-当成另一种-token>9.1 把 Action 当成另一种 Token<a hidden class=anchor aria-hidden=true href=#91-把-action-当成另一种-token>#</a></h3><p>RT-2 的做法非常直接。</p><p>robot action 原本是连续向量：</p>$$
+a_t\in\mathbb R^d
+$$<p>把每个 dimension 离散化之后，可以得到：</p>$$
+[k_1,k_2,\ldots,k_d]
+$$<p>这些整数再映射成模型 vocabulary 中的 token。</p><p>于是 VLM 原本做：</p>$$
+(image,text)
+\rightarrow
+text\ tokens
+$$<p>现在可以做：</p>$$
+(image,instruction)
+\rightarrow
+action\ tokens
+$$<p>从网络形式来看，两者都成为：</p>$$
+\boxed{
+\text{next-token prediction}
+}
+$$<p>这是一个非常强的统一。</p><hr><h3 id=92-rt-2-真正带来的变化>9.2 RT-2 真正带来的变化<a hidden class=anchor aria-hidden=true href=#92-rt-2-真正带来的变化>#</a></h3><p>它不只是扩大 robot dataset。</p><p>更重要的是把：</p>$$
+\boxed{
+\text{Web-scale vision-language knowledge}
+}
+$$<p>和：</p>$$
+\boxed{
+\text{robot demonstrations}
+}
+$$<p>放进同一个模型。</p><p>因此已经在 VLM 里学到的语义关系，有机会直接影响 robot action。</p><p>VLA 在这里开始成为一个比较明确的范式：</p>$$
+\boxed{
+\text{Vision}
++
+\text{Language}
++
+\text{Action}
+}
+$$<p>统一进一个 pretrained multimodal model。</p><p>所以从 RT-1 到 RT-2，更重要的变化是：</p>$$
+\boxed{
+\text{multi-task robot policy}
+\rightarrow
+\text{VLM knowledge transfer to robot control}
+}
+$$<hr><h2 id=10-openvla把这套-vla-范式变成一个开放的研究基础>10. OpenVLA：把这套 VLA 范式变成一个开放的研究基础<a hidden class=anchor aria-hidden=true href=#10-openvla把这套-vla-范式变成一个开放的研究基础>#</a></h2><p><a href=https://arxiv.org/abs/2406.09246>OpenVLA</a> 的重要性和 RT-2 不完全一样。</p><p>它没有重新发明 Action 应该如何生成。</p><p>在 action output 上，它仍然基本延续：</p>$$
+\text{continuous action}
+\rightarrow
+\text{discretization}
+\rightarrow
+\text{action tokens}
+\rightarrow
+\text{autoregressive prediction}
+$$<p>它更重要的目标是：</p>$$
+\boxed{
+\text{让 large VLA 变得开放、可训练、可适配}
+}
+$$<p>OpenVLA 是一个 7B VLA，在大规模 <a href=https://arxiv.org/abs/2310.08864>Open X-Embodiment</a> 机器人数据上训练，并强调：</p><ul><li>open-source</li><li>multi-robot / cross-embodiment</li><li>parameter-efficient adaptation</li><li>对新 robot / task 的 fine-tuning</li></ul><p>因此它更像：</p>$$
+\boxed{
+\text{把 RT-2-style VLA 做成一个可研究的 foundation policy}
+}
+$$<hr><h2 id=11-走到这里会重新遇到一个很有意思的问题action-真的是-language-吗>11. 走到这里，会重新遇到一个很有意思的问题：Action 真的是 Language 吗？<a hidden class=anchor aria-hidden=true href=#11-走到这里会重新遇到一个很有意思的问题action-真的是-language-吗>#</a></h2><p>RT-1 / RT-2 / OpenVLA 的设计逻辑其实非常合理。</p><p>因为手里已经有：</p>$$
+\boxed{
+\text{一个极其强大的 autoregressive Transformer / VLM}
+}
+$$<p>最简单的办法就是把新的 modality 也变成 token。</p><p>于是：</p>$$
+\text{continuous robot action}
+$$<p>被改造成：</p>$$
+\text{discrete action tokens}
+$$<p>整个系统就可以继续复用：</p>$$
+p(x_i|x_{\lt i})
+$$<p>这个成熟的训练范式。</p><p>但从机器人角度重新看，action 本身具有一些和 language 很不一样的性质：</p>$$
+\boxed{
+\text{continuous}
+}
+$$$$
+\boxed{
+\text{high-frequency}
+}
+$$$$
+\boxed{
+\text{strong temporal correlation}
+}
+$$$$
+\boxed{
+\text{potentially multimodal}
+}
+$$<p>而自然语言更天然是离散 symbolic sequence。</p><p>所以这里出现了一个值得保留的问题：</p><blockquote><p>VLA 的早期设计，在一定程度上是不是在让机器人动作适应一个已经非常成功的大模型范式，而不是重新问“机器人动作本身最自然的输出形式是什么”？</p></blockquote><p>这不意味着 autoregressive action prediction 是错的。</p><p>它完全可以表达：</p>$$
+p(A|o) =
+\prod_i p(a_i|a_{\lt i},o)
+$$<p>并且它有非常大的工程优势：</p><ul><li>可以直接复用大模型 architecture；</li><li>vision / language / action 可以统一表示；</li><li>next-token training infrastructure 已经非常成熟；</li><li>sequence likelihood 的定义清晰。</li></ul><p>但它带来的 inductive bias 是：</p>$$
+\boxed{
+\text{trajectory = sequence of discrete symbols}
+}
+$$<p>而 Diffusion / Flow 一类方法则更倾向：</p>$$
+\boxed{
+\text{trajectory = one continuous high-dimensional object}
+}
+$$<p>这两个视角并不等价。</p><hr><h2 id=part-iii--两条路线重新汇合>Part III：$\pi_0$ —— 两条路线重新汇合<a hidden class=anchor aria-hidden=true href=#part-iii--两条路线重新汇合>#</a></h2><h2 id=12--接受-vlm但不再要求-action-服从语言输出接口>12. $\pi_0$ 接受 VLM，但不再要求 Action 服从语言输出接口<a hidden class=anchor aria-hidden=true href=#12--接受-vlm但不再要求-action-服从语言输出接口>#</a></h2><p><a href=https://arxiv.org/abs/2410.24164>$\pi_0$</a> 最有意思的地方，不只是“使用了 <a href=https://arxiv.org/abs/2210.02747>Flow Matching</a>”。</p><p>更重要的是，它重新划分了系统里不同部分的职责。</p><p>一边仍然保留：</p>$$
+\boxed{
+\text{pretrained VLM}
+}
+$$<p>负责：</p><ul><li>visual representation</li><li>language understanding</li><li>semantic knowledge</li><li>task conditioning</li></ul><p>另一边加入：</p>$$
+\boxed{
+\text{Action Expert}
+}
+$$<p>专门负责机器人 continuous action。</p><hr><h3 id=121-action-又重新变回连续-trajectory>12.1 Action 又重新变回连续 trajectory<a hidden class=anchor aria-hidden=true href=#121-action-又重新变回连续-trajectory>#</a></h3><p>$\pi_0$ 不再要求：</p>$$
+\text{continuous action}
+\rightarrow
+\text{256 bins}
+\rightarrow
+\text{text-like tokens}
+$$<p>而是直接定义：</p>$$
+A_t=
+[a_t,a_{t+1},\ldots,a_{t+H-1}]
+$$<p>并建模：</p>$$
+\boxed{
+p(A_t|o_t)
+}
+$$<p>其中 observation 包括：</p>$$
+o_t=
+[\text{images},\text{language},\text{proprioception}]
+$$<p>论文中使用的 action chunk horizon 为：</p>$$
+H=50
+$$<p>然后使用 conditional flow matching 来训练 action generation。</p><p>这在抽象层面与 Diffusion Policy 很接近：</p>$$
+\boxed{
+\text{conditional generative modeling of continuous action chunks}
+}
+$$<p>区别在于具体 generative formulation 使用的是 flow matching，而不是 Diffusion Policy 原论文中的 diffusion process。</p><hr><h2 id=13-为什么这可以看成两条路线重新接上>13. 为什么这可以看成两条路线重新接上？<a hidden class=anchor aria-hidden=true href=#13-为什么这可以看成两条路线重新接上>#</a></h2><p>在机器人 policy 这边，我们已经走到了：</p>$$
+\text{BC}
+\rightarrow
+\text{ACT}
+\rightarrow
+\text{Diffusion Policy}
+$$<p>也就是：</p>$$
+\text{single action}
+\rightarrow
+\text{action chunk}
+\rightarrow
+\text{continuous multimodal trajectory distribution}
+$$<p>另一边，大模型路线走到了：</p>$$
+\text{Transformer}
+\rightarrow
+\text{VLM}
+\rightarrow
+\text{RT-1}
+\rightarrow
+\text{RT-2}
+\rightarrow
+\text{OpenVLA}
+$$<p>也就是：</p>$$
+\text{vision}
++
+\text{language}
++
+\text{action}
+\rightarrow
+\text{unified token sequence}
+$$<p>$\pi_0$ 做的事情可以理解成：</p>$$
+\boxed{
+\text{VLM semantic backbone}
++
+\text{continuous generative action policy}
+}
+$$<p>它保留大模型路线真正有价值的部分：</p>$$
+\text{large-scale visual-language knowledge}
+$$<p>但对 motor output 又重新采用机器人 policy 领域更自然的连续生成方式。</p><p>所以一个比较准确的说法是：</p><blockquote><p>$\pi_0$ 并不是证明 autoregressive action generation 是错误的，而是把“VLM 最擅长的表示方式”和“连续机器人控制最自然的表示方式”重新拆开。</p></blockquote><hr><h2 id=14-这里其实出现了一个很清楚的职责分工>14. 这里其实出现了一个很清楚的职责分工<a hidden class=anchor aria-hidden=true href=#14-这里其实出现了一个很清楚的职责分工>#</a></h2><p>可以粗略理解成：</p><h3 id=vlm>VLM<a hidden class=anchor aria-hidden=true href=#vlm>#</a></h3><p>回答：</p><blockquote><p>我看到了什么？</p><p>用户让我做什么？</p><p>这些物体之间是什么语义关系？</p></blockquote><h3 id=action-expert>Action Expert<a hidden class=anchor aria-hidden=true href=#action-expert>#</a></h3><p>回答：</p><blockquote><p>具体未来几十个低层连续 motor commands 应该怎么运动？</p></blockquote><p>因此整体变成：</p>$$
+(\text{vision},\text{language},\text{robot state})
+$$<p>↓</p>$$
+\text{VLM representation}
+$$<p>↓</p>$$
+\text{Action Expert}
+$$<p>↓</p>$$
+A_t=[a_t,\ldots,a_{t+H-1}]
+$$<p>这比强行让一个 language decoder 承担所有低层连续运动生成，在表示层面更有针对性。</p><hr><h2 id=part-ivaction-generation-之后vla-暴露出来的问题开始改变>Part IV：Action Generation 之后，VLA 暴露出来的问题开始改变<a hidden class=anchor aria-hidden=true href=#part-ivaction-generation-之后vla-暴露出来的问题开始改变>#</a></h2><p>到 $\pi_0$ 以后，问题已经不再只是：</p>$$
+\text{“Action 应该用 AR 还是 Flow？”}
+$$<p>真正困难的问题逐渐变成：</p>$$
+\boxed{
+\text{如何让一个 generalist robot 在复杂环境中长期工作？}
+}
+$$<p>Physical Intelligence 后续的 $\pi$ 系列正好可以看成几个问题的逐步展开。</p><hr><h2 id=15-从会很多动作到-open-world-generalization>15. $\pi_{0.5}$：从“会很多动作”到 Open-World Generalization<a hidden class=anchor aria-hidden=true href=#15-从会很多动作到-open-world-generalization>#</a></h2><p>$\pi_0$ 已经能够跨多种 robot embodiment 输出 continuous action。</p><p>但一个 generalist policy 真正困难的是：</p><blockquote><p>换一个训练时没见过的房子、物体、布局，能不能继续完成任务？</p></blockquote><p><a href=https://arxiv.org/abs/2504.16054>$\pi_{0.5}$</a> 把重点放在：</p>$$
+\boxed{
+\text{open-world generalization}
+}
+$$<p>这里开始使用更加 heterogeneous 的训练数据和任务形式，不只是低层 robot action，还结合：</p><ul><li>high-level semantic prediction</li><li>subtask-like supervision</li><li>web multimodal data</li><li>多种 robot data</li></ul><p>模型开始不只是学习：</p><blockquote><p>当前手应该移动多少？</p></blockquote><p>还要理解：</p><blockquote><p>一个较长任务现在大概处于哪个阶段？</p></blockquote><p>因此从 $\pi_0$ 到 $\pi_{0.5}$，研究重点开始从：</p>$$
+\text{motor generation}
+$$<p>转向：</p>$$
+\boxed{
+\text{generalization across environment and task context}
+}
+$$<hr><h2 id=16-behavior-cloning-最开始的问题又回来了>16. $\pi^*_{0.6}$：Behavior Cloning 最开始的问题又回来了<a hidden class=anchor aria-hidden=true href=#16-behavior-cloning-最开始的问题又回来了>#</a></h2><p>如果一直依赖 expert demonstrations，模型看到的仍然主要是：</p>$$
+d_{\text{expert}}
+$$<p>但真正部署之后，机器人会产生自己的：</p><ul><li>success</li><li>near-success</li><li>failure</li><li>recovery situation</li></ul><p>所以 BC 最早的那个问题重新出现：</p>$$
+\boxed{
+\text{expert data}
+\neq
+\text{deployment experience}
+}
+$$<p><a href=https://arxiv.org/abs/2511.14759>$\pi^*_{0.6}$</a> 的重点转向：</p>$$
+\boxed{
+\text{Learning from Experience}
+}
+$$<p>也就是把：</p>$$
+\text{demonstrations}
+$$<p>和：</p>$$
+\text{autonomous robot rollouts}
+$$<p>以及：</p>$$
+\text{human corrections / interventions}
+$$<p>结合起来，再通过 RL 类方法继续提升 policy。</p><p>这里的范式变化很明显：</p>$$
+\boxed{
+\text{Imitation}
+\rightarrow
+\text{Experience + RL}
+}
+$$<p>它开始直接回应 BC 中另一个一直存在的问题：</p><blockquote><p>仅仅模仿 expert action，不等于根据实际任务结果持续改进 policy。</p></blockquote><hr><h2 id=17-memskill-够多以后瓶颈开始变成记得住吗>17. MEM：Skill 够多以后，瓶颈开始变成“记得住吗？”<a hidden class=anchor aria-hidden=true href=#17-memskill-够多以后瓶颈开始变成记得住吗>#</a></h2><p>当局部 manipulation skill 已经越来越强时，一个很朴素的问题会变得越来越明显：</p><blockquote><p>任务做了十分钟以后，机器人还知道自己刚才干了什么吗？</p></blockquote><p>如果任务是：</p><blockquote><p>整理厨房</p></blockquote><p>机器人需要知道：</p><ul><li>哪些东西已经收过；</li><li>哪一步失败了；</li><li>哪些目标还没有完成；</li><li>某个物体刚才在哪里；</li><li>当前任务进行到了哪个阶段。</li></ul><p>你不可能无限制地把过去所有 raw RGB frame 都塞给 Transformer。</p><p><a href=https://arxiv.org/abs/2603.03596>Multi-Scale Embodied Memory（MEM）</a> 于是明确引入：</p>$$
+\boxed{
+\text{short-term visual memory}
++
+\text{long-term semantic memory}
+}
+$$<p>短期保留高分辨率、细粒度近期状态；</p><p>长期把过去压缩成更抽象的 semantic / episodic information。</p><p>到这里，VLA 的研究问题已经明显从：</p>$$
+(o_t,l)\rightarrow A_t
+$$<p>开始走向：</p>$$
+\boxed{
+\text{partial observability}
++
+\text{progress tracking}
++
+\text{long-horizon memory}
+}
+$$<hr><h2 id=18-subgoalsteerability-和-world-model-开始进入-vla>18. $\pi_{0.7}$：Subgoal、Steerability 和 World Model 开始进入 VLA<a hidden class=anchor aria-hidden=true href=#18-subgoalsteerability-和-world-model-开始进入-vla>#</a></h2><p><a href=https://arxiv.org/abs/2604.15483>$\pi_{0.7}$</a> 又进一步把问题变成：</p><blockquote><p>一个 generalist model 能不能组合已有 skill，在新环境中按照不同策略完成新任务？</p></blockquote><p>它开始使用更加丰富的 prompt / context，包括：</p><ul><li>task instruction</li><li>subtask information</li><li>episode metadata</li><li>behavior quality / style information</li><li>visual subgoal</li></ul><p>也就是说，模型条件不只是：</p>$$
+\text{“做什么”}
+$$<p>还包括：</p>$$
+\boxed{
+\text{“应该以什么方式做”}
+}
+$$<p>这就是 steerability 的一部分。</p><hr><h3 id=181-world-model-又重新出现>18.1 World Model 又重新出现<a hidden class=anchor aria-hidden=true href=#181-world-model-又重新出现>#</a></h3><p>这里有一个对我们后续阅读很重要的点。</p><p>$\pi_{0.7}$ 可以使用 world model 生成 visual subgoal：</p>$$
+(o_t,l_{\text{subtask}})
+\rightarrow
+\hat o_{\text{subgoal}}
+$$<p>然后 VLA 根据：</p>$$
+(o_t,\hat o_{\text{subgoal}},l)
+$$<p>生成动作。</p><p>这和 <a href=https://proceedings.mlr.press/v97/hafner19a.html>PlaNet</a> / <a href=https://arxiv.org/abs/1912.01603>Dreamer</a> 那种：</p>$$
+(s_t,a_t)\rightarrow s_{t+1}
+$$<p>再利用想象出的未来轨迹进行在线规划（PlaNet）或学习策略（Dreamer）的 forward-dynamics world model 不完全一样。</p><p>这里的 world model 更接近：</p>$$
+\boxed{
+\text{预测“下一阶段世界应该长什么样”}
+}
+$$<p>然后 VLA 解决：</p>$$
+(o_{\text{current}},o_{\text{subgoal}})
+\rightarrow
+A
+$$<p>这已经有一点 inverse-dynamics 的味道。</p><p>因此 world model 在现代 VLA 体系中，并不一定非要作为一个：</p>$$
+\text{candidate action simulator}
+$$<p>它也可以作为：</p>$$
+\boxed{
+\text{subgoal generator / future-state proposer}
+}
+$$<p>出现。</p><hr><h2 id=19-到这里vla-的问题已经发生了明显变化>19. 到这里，VLA 的问题已经发生了明显变化<a hidden class=anchor aria-hidden=true href=#19-到这里vla-的问题已经发生了明显变化>#</a></h2><p>最开始关心的是：</p>$$
+\boxed{
+\text{机器人动作怎么预测？}
+}
+$$<p>于是有：</p>$$
+\text{BC}
+\rightarrow
+\text{ACT}
+\rightarrow
+\text{Diffusion Policy}
+$$<p>后来大模型路线关心：</p>$$
+\boxed{
+\text{一个 policy 怎么获得更多任务和知识？}
+}
+$$<p>于是有：</p>$$
+\text{RT-1}
+\rightarrow
+\text{RT-2}
+\rightarrow
+\text{OpenVLA}
+$$<p>然后两者在：</p>$$
+\boxed{
+\pi_0
+}
+$$<p>附近重新汇合：</p>$$
+\text{VLM semantics}
++
+\text{continuous generative motor policy}
+$$<p>再往后，问题开始变成：</p>$$
+\text{open-world generalization}
+$$$$
+\text{learning from experience}
+$$$$
+\text{memory}
+$$$$
+\text{subtask}
+$$$$
+\text{world model}
+$$$$
+\text{skill composition}
+$$<p>也就是说：</p>$$
+\boxed{
+\text{VLA 正在从“动作生成模型”逐渐变成更完整的 embodied agent}
+}
+$$<hr><h2 id=20-回头看两条路线最有意思的交叉点是什么>20. 回头看，两条路线最有意思的交叉点是什么？<a hidden class=anchor aria-hidden=true href=#20-回头看两条路线最有意思的交叉点是什么>#</a></h2><p>目前我觉得最值得记录的是：</p><h3 id=第一条线机器人-action-modeling>第一条线：机器人 Action Modeling<a hidden class=anchor aria-hidden=true href=#第一条线机器人-action-modeling>#</a></h3>$$
+\boxed{
+o\rightarrow a
+}
+$$<p>↓</p>$$
+\boxed{
+o\rightarrow A
+}
+$$<p>↓</p>$$
+\boxed{
+o\rightarrow p(A|o)
+}
+$$<p>这条线不断问：</p><blockquote><p>什么样的 output representation 才适合真实机器人运动？</p></blockquote><hr><h3 id=第二条线foundation-model--vla>第二条线：Foundation Model / VLA<a hidden class=anchor aria-hidden=true href=#第二条线foundation-model--vla>#</a></h3>$$
+\boxed{
+\text{multi-task robot Transformer}
+}
+$$<p>↓</p>$$
+\boxed{
+\text{VLM knowledge transfer}
+}
+$$<p>↓</p>$$
+\boxed{
+\text{Everything-as-Token}
+}
+$$<p>它不断问：</p><blockquote><p>能不能把已有的大模型 scaling 能力迁移到机器人？</p></blockquote><hr><h3 id=最后两者重新汇合>最后两者重新汇合<a hidden class=anchor aria-hidden=true href=#最后两者重新汇合>#</a></h3>$$
+\boxed{
+\text{VLM}
++
+\text{continuous generative action model}
+}
+$$<p>从这个角度看，$\pi_0$ 的意义并不只是：</p><blockquote><p>flow matching 比 autoregressive 更先进。</p></blockquote><p>真正有意思的是：</p>$$
+\boxed{
+\text{系统开始重新尊重不同 modality 本身的结构差异}
+}
+$$<p>Vision / language 可以继续从 VLM 获得强大的 pretrained representation。</p><p>Motor control 则不必为了“统一”而强行变成 text-like token sequence。</p><hr><h2 id=21-这里还没有解决的问题>21. 这里还没有解决的问题<a hidden class=anchor aria-hidden=true href=#21-这里还没有解决的问题>#</a></h2><p>到这里暂时不需要下结论说哪一种 VLA architecture 最终会赢。</p><p>反而有几个问题值得留着，后面进入 long-horizon 再回来判断。</p><h3 id=action-chunk-到底解决了多少-long-horizon>Action Chunk 到底解决了多少 Long-Horizon？<a hidden class=anchor aria-hidden=true href=#action-chunk-到底解决了多少-long-horizon>#</a></h3><p>Action chunk 可以把：</p>$$
+1000\text{ 个低层 control steps}
+$$<p>压成：</p>$$
+20\text{ 个局部 chunks}
+$$<p>但这仍然不等于：</p>$$
+\boxed{
+\text{task-level long-horizon reasoning}
+}
+$$<p>它主要解决的是局部 temporal coherence。</p><hr><h3 id=vla-是否真的具有-planning>VLA 是否真的具有 Planning？<a hidden class=anchor aria-hidden=true href=#vla-是否真的具有-planning>#</a></h3><p>大规模 demonstration 当然可能让模型参数里吸收很多 planning pattern。</p><p>所以 VLA 并不一定表现得“完全没有规划能力”。</p><p>但：</p>$$
+(o,l)\rightarrow A
+$$<p>和：</p>$$
+\text{candidate actions}
+\rightarrow
+\text{future rollout}
+\rightarrow
+\text{evaluation}
+\rightarrow
+\text{selection}
+$$<p>仍然是两种不同机制。</p><p>一个是 amortized behavior。</p><p>另一个是 explicit look-ahead。</p><hr><h3 id=generative-action-policy-解决的不是-task-level-uncertainty>Generative Action Policy 解决的不是 Task-Level Uncertainty<a hidden class=anchor aria-hidden=true href=#generative-action-policy-解决的不是-task-level-uncertainty>#</a></h3><p>Diffusion / Flow 可以很好地处理：</p>$$
+p(A|o)
+$$<p>中的 motor multimodality。</p><p>但如果真正的不确定性是：</p><blockquote><p>我现在到底应该先收盘子，还是先关冰箱？</p></blockquote><p>那么这已经不是简单的 low-level action distribution 问题。</p><p>它需要：</p><ul><li>task state</li><li>memory</li><li>progress</li><li>subgoal</li><li>planning</li></ul><p>等更高层表示。</p><hr><h3 id=memory--planning--world-model-最终会不会都被一个大模型吸收>Memory / Planning / World Model 最终会不会都被一个大模型吸收？<a hidden class=anchor aria-hidden=true href=#memory--planning--world-model-最终会不会都被一个大模型吸收>#</a></h3><p>现在还不好下结论。</p><p>一种路线是模块化：</p>$$
+\text{VLA}
++
+\text{Memory}
++
+\text{Planner}
++
+\text{World Model}
+$$<p>另一种路线可能希望：</p>$$
+\boxed{
+\text{一个更大的 sequence / multimodal model}
+}
+$$<p>把这些功能逐渐隐式吸收。</p><p>目前 $\pi_{0.7}$ 这类工作反而说明，至少在当前阶段，显式提供：</p><ul><li>metadata</li><li>memory</li><li>visual subgoal</li><li>world model context</li></ul><p>依然有实际价值。</p><hr><h2 id=22-暂时的理解>22. 暂时的理解<a hidden class=anchor aria-hidden=true href=#22-暂时的理解>#</a></h2><p>现在回头看，VLA 的发展不能只概括成：</p>$$
+\text{模型变大}
+$$<p>或者：</p>$$
+\text{数据变多}
+$$<p>至少有两条非常清楚的问题线。</p><p>第一条是：</p>$$
+\boxed{
+\text{机器人动作应该怎么表示和生成？}
+}
+$$<p>从单步 regression，到 action chunk，再到 multimodal continuous trajectory generation。</p><p>第二条是：</p>$$
+\boxed{
+\text{如何把 Foundation Model 的 scaling 和世界知识带进机器人？}
+}
+$$<p>从 multi-task Transformer，到 VLM knowledge transfer，再到 cross-embodiment VLA。</p><p>这两条路线一度通过：</p>$$
+\boxed{
+\text{action tokenization + autoregressive prediction}
+}
+$$<p>被统一到同一个大模型范式。</p><p>然后到了 $\pi_0$ 一类模型，又开始重新拆分：</p>$$
+\boxed{
+\text{语义继续使用 VLM 擅长的表示，
+连续控制使用机器人 policy 更自然的生成方式。}
+}
+$$<p>而在动作输出逐渐成熟以后，真正困难的问题又继续向外扩：</p>$$
+\text{generalization}
+\rightarrow
+\text{experience learning}
+\rightarrow
+\text{memory}
+\rightarrow
+\text{subgoal}
+\rightarrow
+\text{world model}
+\rightarrow
+\text{long-horizon}
+$$<p>所以目前比较自然的下一问已经不是：</p><blockquote><p>下一个更大的 VLA 是什么？</p></blockquote><p>而是：</p>$$
+\boxed{
+\text{一个通用 VLA 要真正变成长期工作的 embodied agent，
+还缺哪些机制？}
+}
+$$<p>这也是后面继续看 Long-Horizon、Memory、Planning 和 World Model × VLA 时，需要重新回来的问题。</p><hr><h2 id=参考论文>参考论文<a hidden class=anchor aria-hidden=true href=#参考论文>#</a></h2><ol><li>Ross, S., Gordon, G., & Bagnell, D. <strong><a href=https://proceedings.mlr.press/v15/ross11a.html>A Reduction of Imitation Learning and Structured Prediction to No-Regret Online Learning (DAgger)</a></strong>. AISTATS, 2011.</li><li>Zhao, T. Z., Kumar, V., Levine, S., & Finn, C. <strong><a href=https://arxiv.org/abs/2304.13705>Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware (ACT / ALOHA)</a></strong>. RSS, 2023.</li><li>Chi, C., et al. <strong><a href=https://arxiv.org/abs/2303.04137>Diffusion Policy: Visuomotor Policy Learning via Action Diffusion</a></strong>. RSS, 2023.</li><li>Brohan, A., et al. <strong><a href=https://arxiv.org/abs/2212.06817>RT-1: Robotics Transformer for Real-World Control at Scale</a></strong>. 2022.</li><li>Brohan, A., et al. <strong><a href=https://arxiv.org/abs/2307.15818>RT-2: Vision-Language-Action Models Transfer Web Knowledge to Robotic Control</a></strong>. 2023.</li><li>Kim, M. J., et al. <strong><a href=https://arxiv.org/abs/2406.09246>OpenVLA: An Open-Source Vision-Language-Action Model</a></strong>. 2024.</li><li>Black, K., et al. <strong><a href=https://arxiv.org/abs/2410.24164>$\pi_0$: A Vision-Language-Action Flow Model for General Robot Control</a></strong>. Physical Intelligence, 2024.</li><li>Physical Intelligence. <strong><a href=https://arxiv.org/abs/2504.16054>$\pi_{0.5}$: A Vision-Language-Action Model with Open-World Generalization</a></strong>. 2025.</li><li>Physical Intelligence. <strong><a href=https://arxiv.org/abs/2511.14759>$\pi^*_{0.6}$: A VLA that Learns from Experience</a></strong>. 2025.</li><li>Physical Intelligence. <strong><a href=https://arxiv.org/abs/2603.03596>MEM: Multi-Scale Embodied Memory for Vision Language Action Models</a></strong>. 2026.</li><li>Physical Intelligence. <strong><a href=https://arxiv.org/abs/2604.15483>$\pi_{0.7}$: A Steerable Generalist Robotic Foundation Model with Emergent Capabilities</a></strong>. 2026.</li></ol></div><footer class=post-footer><ul class=post-tags></ul><nav class=paginav><a class=next href=https://letsgetai.github.io/posts/world-model-problem-evolution/><span class=title>下一页 »</span>
+<span>World Model：从“学一个世界”到“学对决策有用的未来”——一次问题演进记录</span></a></nav><ul class=share-buttons><li><a target=_blank rel="noopener noreferrer" aria-label="share VLA：动作建模与通用机器人策略 on x" href="https://x.com/intent/tweet/?text=VLA%ef%bc%9a%e5%8a%a8%e4%bd%9c%e5%bb%ba%e6%a8%a1%e4%b8%8e%e9%80%9a%e7%94%a8%e6%9c%ba%e5%99%a8%e4%ba%ba%e7%ad%96%e7%95%a5&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2fvla-action-modeling-generalist-policy%2f&amp;hashtags="><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M512 62.554V449.446C512 483.97 483.97 512 449.446 512H62.554C28.03 512 0 483.97.0 449.446V62.554C0 28.03 28.029.0 62.554.0H449.446C483.971.0 512 28.03 512 62.554zM269.951 190.75 182.567 75.216H56L207.216 272.95 63.9 436.783h61.366L235.9 310.383l96.667 126.4H456L298.367 228.367l134-153.151H371.033zM127.633 110h36.468l219.38 290.065H349.5z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share VLA：动作建模与通用机器人策略 on linkedin" href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2fvla-action-modeling-generalist-policy%2f&amp;title=VLA%ef%bc%9a%e5%8a%a8%e4%bd%9c%e5%bb%ba%e6%a8%a1%e4%b8%8e%e9%80%9a%e7%94%a8%e6%9c%ba%e5%99%a8%e4%ba%ba%e7%ad%96%e7%95%a5&amp;summary=VLA%ef%bc%9a%e5%8a%a8%e4%bd%9c%e5%bb%ba%e6%a8%a1%e4%b8%8e%e9%80%9a%e7%94%a8%e6%9c%ba%e5%99%a8%e4%ba%ba%e7%ad%96%e7%95%a5&amp;source=https%3a%2f%2fletsgetai.github.io%2fposts%2fvla-action-modeling-generalist-policy%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zM160.461 423.278V197.561h-75.04v225.717h75.04zm270.539.0V293.839c0-69.333-37.018-101.586-86.381-101.586-39.804.0-57.634 21.891-67.617 37.266v-31.958h-75.021c.995 21.181.0 225.717.0 225.717h75.02V297.222c0-6.748.486-13.492 2.474-18.315 5.414-13.475 17.767-27.434 38.494-27.434 27.135.0 38.007 20.707 38.007 51.037v120.768H431zM123.448 88.722C97.774 88.722 81 105.601 81 127.724c0 21.658 16.264 39.002 41.455 39.002h.484c26.165.0 42.452-17.344 42.452-39.002-.485-22.092-16.241-38.954-41.943-39.002z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share VLA：动作建模与通用机器人策略 on reddit" href="https://reddit.com/submit?url=https%3a%2f%2fletsgetai.github.io%2fposts%2fvla-action-modeling-generalist-policy%2f&title=VLA%ef%bc%9a%e5%8a%a8%e4%bd%9c%e5%bb%ba%e6%a8%a1%e4%b8%8e%e9%80%9a%e7%94%a8%e6%9c%ba%e5%99%a8%e4%ba%ba%e7%ad%96%e7%95%a5"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zM446 265.638c0-22.964-18.616-41.58-41.58-41.58-11.211.0-21.361 4.457-28.841 11.666-28.424-20.508-67.586-33.757-111.204-35.278l18.941-89.121 61.884 13.157c.756 15.734 13.642 28.29 29.56 28.29 16.407.0 29.706-13.299 29.706-29.701.0-16.403-13.299-29.702-29.706-29.702-11.666.0-21.657 6.792-26.515 16.578l-69.105-14.69c-1.922-.418-3.939-.042-5.585 1.036-1.658 1.073-2.811 2.761-3.224 4.686l-21.152 99.438c-44.258 1.228-84.046 14.494-112.837 35.232-7.468-7.164-17.589-11.591-28.757-11.591-22.965.0-41.585 18.616-41.585 41.58.0 16.896 10.095 31.41 24.568 37.918-.639 4.135-.99 8.328-.99 12.576.0 63.977 74.469 115.836 166.33 115.836s166.334-51.859 166.334-115.836c0-4.218-.347-8.387-.977-12.493 14.564-6.47 24.735-21.034 24.735-38.001zM326.526 373.831c-20.27 20.241-59.115 21.816-70.534 21.816-11.428.0-50.277-1.575-70.522-21.82-3.007-3.008-3.007-7.882.0-10.889 3.003-2.999 7.882-3.003 10.885.0 12.777 12.781 40.11 17.317 59.637 17.317 19.522.0 46.86-4.536 59.657-17.321 3.016-2.999 7.886-2.995 10.885.008 3.008 3.011 3.003 7.882-.008 10.889zm-5.23-48.781c-16.373.0-29.701-13.324-29.701-29.698.0-16.381 13.328-29.714 29.701-29.714 16.378.0 29.706 13.333 29.706 29.714.0 16.374-13.328 29.698-29.706 29.698zM160.91 295.348c0-16.381 13.328-29.71 29.714-29.71 16.369.0 29.689 13.329 29.689 29.71.0 16.373-13.32 29.693-29.689 29.693-16.386.0-29.714-13.32-29.714-29.693z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share VLA：动作建模与通用机器人策略 on facebook" href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fletsgetai.github.io%2fposts%2fvla-action-modeling-generalist-policy%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H342.978V319.085h66.6l12.672-82.621h-79.272v-53.617c0-22.603 11.073-44.636 46.58-44.636H425.6v-70.34s-32.71-5.582-63.982-5.582c-65.288.0-107.96 39.569-107.96 111.204v62.971h-72.573v82.621h72.573V512h-191.104c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share VLA：动作建模与通用机器人策略 on whatsapp" href="https://api.whatsapp.com/send?text=VLA%ef%bc%9a%e5%8a%a8%e4%bd%9c%e5%bb%ba%e6%a8%a1%e4%b8%8e%e9%80%9a%e7%94%a8%e6%9c%ba%e5%99%a8%e4%ba%ba%e7%ad%96%e7%95%a5%20-%20https%3a%2f%2fletsgetai.github.io%2fposts%2fvla-action-modeling-generalist-policy%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zm-58.673 127.703c-33.842-33.881-78.847-52.548-126.798-52.568-98.799.0-179.21 80.405-179.249 179.234-.013 31.593 8.241 62.428 23.927 89.612l-25.429 92.884 95.021-24.925c26.181 14.28 55.659 21.807 85.658 21.816h.074c98.789.0 179.206-80.413 179.247-179.243.018-47.895-18.61-92.93-52.451-126.81zM263.976 403.485h-.06c-26.734-.01-52.954-7.193-75.828-20.767l-5.441-3.229-56.386 14.792 15.05-54.977-3.542-5.637c-14.913-23.72-22.791-51.136-22.779-79.287.033-82.142 66.867-148.971 149.046-148.971 39.793.014 77.199 15.531 105.329 43.692 28.128 28.16 43.609 65.592 43.594 105.4-.034 82.149-66.866 148.983-148.983 148.984zm81.721-111.581c-4.479-2.242-26.499-13.075-30.604-14.571-4.105-1.495-7.091-2.241-10.077 2.241-2.986 4.483-11.569 14.572-14.182 17.562-2.612 2.988-5.225 3.364-9.703 1.12-4.479-2.241-18.91-6.97-36.017-22.23C231.8 264.15 222.81 249.484 220.198 245s-.279-6.908 1.963-9.14c2.016-2.007 4.48-5.232 6.719-7.847 2.24-2.615 2.986-4.484 4.479-7.472 1.493-2.99.747-5.604-.374-7.846-1.119-2.241-10.077-24.288-13.809-33.256-3.635-8.733-7.327-7.55-10.077-7.688-2.609-.13-5.598-.158-8.583-.158-2.986.0-7.839 1.121-11.944 5.604-4.105 4.484-15.675 15.32-15.675 37.364.0 22.046 16.048 43.342 18.287 46.332 2.24 2.99 31.582 48.227 76.511 67.627 10.685 4.615 19.028 7.371 25.533 9.434 10.728 3.41 20.492 2.929 28.209 1.775 8.605-1.285 26.499-10.833 30.231-21.295 3.732-10.464 3.732-19.431 2.612-21.298-1.119-1.869-4.105-2.99-8.583-5.232z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share VLA：动作建模与通用机器人策略 on telegram" href="https://telegram.me/share/url?text=VLA%ef%bc%9a%e5%8a%a8%e4%bd%9c%e5%bb%ba%e6%a8%a1%e4%b8%8e%e9%80%9a%e7%94%a8%e6%9c%ba%e5%99%a8%e4%ba%ba%e7%ad%96%e7%95%a5&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2fvla-action-modeling-generalist-policy%2f"><svg viewBox="2 2 28 28" height="30" width="30" fill="currentColor"><path d="M26.49 29.86H5.5a3.37 3.37.0 01-2.47-1 3.35 3.35.0 01-1-2.47V5.48A3.36 3.36.0 013 3 3.37 3.37.0 015.5 2h21A3.38 3.38.0 0129 3a3.36 3.36.0 011 2.46V26.37a3.35 3.35.0 01-1 2.47 3.38 3.38.0 01-2.51 1.02zm-5.38-6.71a.79.79.0 00.85-.66L24.73 9.24a.55.55.0 00-.18-.46.62.62.0 00-.41-.17q-.08.0-16.53 6.11a.59.59.0 00-.41.59.57.57.0 00.43.52l4 1.24 1.61 4.83a.62.62.0 00.63.43.56.56.0 00.4-.17L16.54 20l4.09 3A.9.9.0 0021.11 23.15zM13.8 20.71l-1.21-4q8.72-5.55 8.78-5.55c.15.0.23.0.23.16a.18.18.0 010 .06s-2.51 2.3-7.52 6.8z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share VLA：动作建模与通用机器人策略 on ycombinator" href="https://news.ycombinator.com/submitlink?t=VLA%ef%bc%9a%e5%8a%a8%e4%bd%9c%e5%bb%ba%e6%a8%a1%e4%b8%8e%e9%80%9a%e7%94%a8%e6%9c%ba%e5%99%a8%e4%ba%ba%e7%ad%96%e7%95%a5&u=https%3a%2f%2fletsgetai.github.io%2fposts%2fvla-action-modeling-generalist-policy%2f"><svg width="30" height="30" viewBox="0 0 512 512" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554V449.446C512 483.97 483.97 512 449.446 512H62.554C28.03 512 0 483.97.0 449.446V62.554C0 28.03 28.029.0 62.554.0H449.446zM183.8767 87.9921h-62.034L230.6673 292.4508V424.0079h50.6655V292.4508L390.1575 87.9921H328.1233L256 238.2489z"/></svg></a></li></ul></footer></article></main><footer class=footer><span>&copy; 2026 <a href=https://letsgetai.github.io/>The Herta</a></span> ·
+<span>Powered by
+<a href="https://gohugo.io/?utm_source=papermod" rel=noopener target=_blank>Hugo</a> &
+<a href=https://github.com/adityatelange/hugo-PaperMod/ rel=noopener target=_blank>PaperMod</a></span></footer><a href=#top id=top-link class="top-link hidden" aria-label="go to top" title="Go to Top (Alt + G)" accesskey=g><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevrons-up"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
+</a><script>let menu=document.getElementById("menu");if(menu){const e=localStorage.getItem("menu-scroll-position");e&&(menu.scrollLeft=parseInt(e,10)),menu.onscroll=function(){localStorage.setItem("menu-scroll-position",menu.scrollLeft)}}document.querySelectorAll('a[href^="#"]').forEach(e=>{e.addEventListener("click",function(e){e.preventDefault();var t=this.getAttribute("href").substr(1);window.matchMedia("(prefers-reduced-motion: reduce)").matches?document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView():document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView({behavior:"smooth"}),t==="top"?history.replaceState(null,null," "):history.pushState(null,null,`#${t}`)})})</script><script>var toplink=document.getElementById("top-link");window.onscroll=function(){const e=window.innerHeight;document.body.scrollTop>e||document.documentElement.scrollTop>e?toplink.classList.remove("hidden"):toplink.classList.add("hidden")}</script><script>document.getElementById("theme-toggle").addEventListener("click",()=>{const e=document.querySelector("html");e.dataset.theme==="dark"?(e.dataset.theme="light",localStorage.setItem("pref-theme","light")):(e.dataset.theme="dark",localStorage.setItem("pref-theme","dark"))})</script><script>document.querySelectorAll("pre > code").forEach(e=>{const n=e.parentNode.parentNode,t=document.createElement("button");t.classList.add("copy-code"),t.innerHTML="复制";function s(){t.innerHTML="已复制！",setTimeout(()=>{t.innerHTML="复制"},2e3)}t.addEventListener("click",t=>{if("clipboard"in navigator){navigator.clipboard.writeText(e.textContent),s();return}const n=document.createRange();n.selectNodeContents(e);const o=window.getSelection();o.removeAllRanges(),o.addRange(n);try{document.execCommand("copy"),s()}catch{}o.removeRange(n)}),n.classList.contains("highlight")?n.appendChild(t):n.parentNode.firstChild==n||(e.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName=="TABLE"?e.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(t):e.parentNode.appendChild(t))})</script></body></html>

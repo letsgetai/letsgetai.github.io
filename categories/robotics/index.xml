@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Robotics on The Herta</title><link>https://letsgetai.github.io/categories/robotics/</link><description>Recent content in Robotics on The Herta</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sat, 17 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://letsgetai.github.io/categories/robotics/index.xml" rel="self" type="application/rss+xml"/><item><title>VLA：动作建模与通用机器人策略</title><link>https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/</link><pubDate>Sat, 17 Oct 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/</guid><description>&lt;blockquote&gt;
+&lt;p&gt;VLA 的发展有两条线。&lt;/p&gt;
+&lt;p&gt;一条来自机器人领域本身：&lt;strong&gt;动作到底应该怎么表示、怎么生成？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;另一条来自大模型：&lt;strong&gt;已经非常成功的 &lt;a href="https://arxiv.org/abs/1706.03762"&gt;Transformer&lt;/a&gt; / VLM，能不能直接变成一个通用机器人 policy？&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;前一条路线从 &lt;a href="https://publications.ri.cmu.edu/alvinn-an-autonomous-land-vehicle-in-a-neural-network"&gt;Behavior Cloning&lt;/a&gt;、&lt;a href="https://arxiv.org/abs/2304.13705"&gt;Action Chunking&lt;/a&gt; 一直走到 &lt;a href="https://arxiv.org/abs/2303.04137"&gt;Diffusion Policy&lt;/a&gt;；后一条路线则从 &lt;a href="https://arxiv.org/abs/2212.06817"&gt;RT-1&lt;/a&gt;、&lt;a href="https://arxiv.org/abs/2307.15818"&gt;RT-2&lt;/a&gt;、&lt;a href="https://arxiv.org/abs/2406.09246"&gt;OpenVLA&lt;/a&gt; 逐渐把 vision、language、action 都塞进统一的 token / autoregressive 范式。&lt;/p&gt;
+&lt;p&gt;到 &lt;a href="https://arxiv.org/abs/2410.24164"&gt;$\pi_0$&lt;/a&gt; 附近，这两条路线又重新汇合：保留 VLM 擅长的视觉语言表示，但不再要求连续机器人动作也必须按照语言 token 的方式输出，而是重新使用面向连续 action chunk 的生成式建模。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id="1-vla-到底在解决什么问题"&gt;1. VLA 到底在解决什么问题？&lt;/h2&gt;
+&lt;p&gt;最简单的机器人 policy 可以写成：&lt;/p&gt;
+$$
+(o_t,l)\rightarrow a_t
+$$&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$o_t$：当前 observation，例如 RGB 图像、机器人关节状态；&lt;/li&gt;
+&lt;li&gt;$l$：语言任务描述；&lt;/li&gt;
+&lt;li&gt;$a_t$：当前机器人动作。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;如果只看这个公式，VLA 好像只是：&lt;/p&gt;
+$$
+\text{Vision}
++
+\text{Language}
+\rightarrow
+\text{Action}
+$$&lt;p&gt;但真正往下拆，会发现至少有两个问题混在一起。&lt;/p&gt;
+&lt;p&gt;第一个问题是：&lt;/p&gt;
+$$
+\boxed{
+\text{Action 到底应该是什么样的输出对象？}
+}
+$$&lt;p&gt;是一个确定的连续向量？&lt;/p&gt;
+&lt;p&gt;是一串未来动作？&lt;/p&gt;
+&lt;p&gt;是一个概率分布？&lt;/p&gt;
+&lt;p&gt;还是一串离散 token？&lt;/p&gt;
+&lt;p&gt;第二个问题是：&lt;/p&gt;
+$$
+\boxed{
+\text{如何把大规模视觉语言模型已经学到的知识，变成机器人行为？}
+}
+$$&lt;p&gt;前一个问题在 VLA 出现之前，机器人 imitation learning 领域已经讨论了很久。&lt;/p&gt;</description></item></channel></rss>
