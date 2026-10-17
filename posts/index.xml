@@ -1,4 +1,62 @@
-<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Posts on The Herta</title><link>https://letsgetai.github.io/posts/</link><description>Recent content in Posts on The Herta</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sat, 17 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://letsgetai.github.io/posts/index.xml" rel="self" type="application/rss+xml"/><item><title>VLA：动作建模与通用机器人策略</title><link>https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/</link><pubDate>Sat, 17 Oct 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/</guid><description>&lt;blockquote&gt;
+<?xml version="1.0" encoding="utf-8" standalone="yes"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:content="http://purl.org/rss/1.0/modules/content/"><channel><title>Posts on The Herta</title><link>https://letsgetai.github.io/posts/</link><description>Recent content in Posts on The Herta</description><generator>Hugo</generator><language>zh-cn</language><lastBuildDate>Sun, 18 Oct 2026 00:00:00 +0000</lastBuildDate><atom:link href="https://letsgetai.github.io/posts/index.xml" rel="self" type="application/rss+xml"/><item><title>Long-Horizon VLA：任务状态、规划、执行与编排</title><link>https://letsgetai.github.io/posts/long-horizon-vla-task-state-planning-orchestration/</link><pubDate>Sun, 18 Oct 2026 00:00:00 +0800</pubDate><guid>https://letsgetai.github.io/posts/long-horizon-vla-task-state-planning-orchestration/</guid><description>&lt;blockquote&gt;
+&lt;p&gt;机器人需要在持续交互中维护一个可靠的任务状态，并据此不断规划、执行、验证和修正。&lt;/p&gt;
+&lt;p&gt;因此，一个比较自然的结构是：&lt;/p&gt;
+&lt;/blockquote&gt;
+$$
+\boxed{
+\text{Task State}
+\rightarrow
+\text{Planner}
+\rightarrow
+\text{Executor}
+\rightarrow
+\text{Orchestrator / Harness}
+}
+$$&lt;blockquote&gt;
+&lt;p&gt;然后环境反馈重新进入 Task State，形成闭环。&lt;/p&gt;
+&lt;p&gt;这里很多论文都会同时跨越多个模块，所以不强行把“一篇论文”归到唯一一类。更合适的做法是：&lt;strong&gt;正文按问题和模块组织，论文作为跨模块案例穿插进去。&lt;/strong&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;hr&gt;
+&lt;h2 id="1-long-horizon-vla-到底在解决什么问题"&gt;1. Long-Horizon VLA 到底在解决什么问题？&lt;/h2&gt;
+&lt;p&gt;普通 VLA 可以粗略写成：&lt;/p&gt;
+$$
+(o_t,l)\rightarrow A_t
+$$&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$o_t$：当前视觉、本体感知等 observation；&lt;/li&gt;
+&lt;li&gt;$l$：语言任务；&lt;/li&gt;
+&lt;li&gt;$A_t$：当前要执行的一段 action chunk。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这对于局部 manipulation 已经是一个很强的范式：&lt;/p&gt;
+$$
+\text{当前看到什么}
++
+\text{当前要做什么}
+\rightarrow
+\text{接下来怎么动}
+$$&lt;p&gt;但任务一旦变长，问题就发生变化。&lt;/p&gt;
+&lt;p&gt;例如：&lt;/p&gt;
+&lt;blockquote&gt;
+&lt;p&gt;整理厨房。&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;机器人不只需要知道“现在怎么抓这个杯子”，还必须持续回答：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;之前已经做过什么？&lt;/li&gt;
+&lt;li&gt;哪些任务已经完成？&lt;/li&gt;
+&lt;li&gt;当前 subtask 做到什么程度？&lt;/li&gt;
+&lt;li&gt;刚才那一步到底成功了吗？&lt;/li&gt;
+&lt;li&gt;当前状态和预期是否一致？&lt;/li&gt;
+&lt;li&gt;原来的计划还有效吗？&lt;/li&gt;
+&lt;li&gt;现在应该继续、重试、恢复，还是重新规划？&lt;/li&gt;
+&lt;li&gt;如果有多个未来选择，哪个更好？&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;因此 Long-Horizon 的核心问题可以写成：&lt;/p&gt;
+$$
+\boxed{
+\text{如何在持续环境交互中维护一个可靠的 Task State，
+并据此持续决策？}
+}
+$$&lt;p&gt;机器人其实一直都有环境反馈：&lt;/p&gt;</description></item><item><title>VLA：动作建模与通用机器人策略</title><link>https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/</link><pubDate>Sat, 17 Oct 2026 00:00:00 +0000</pubDate><guid>https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/</guid><description>&lt;blockquote&gt;
 &lt;p&gt;VLA 的发展有两条线。&lt;/p&gt;
 &lt;p&gt;一条来自机器人领域本身：&lt;strong&gt;动作到底应该怎么表示、怎么生成？&lt;/strong&gt;&lt;/p&gt;
 &lt;p&gt;另一条来自大模型：&lt;strong&gt;已经非常成功的 &lt;a href="https://arxiv.org/abs/1706.03762"&gt;Transformer&lt;/a&gt; / VLM，能不能直接变成一个通用机器人 policy？&lt;/strong&gt;&lt;/p&gt;

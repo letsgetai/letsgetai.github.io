@@ -1,0 +1,796 @@
+<!doctype html><html lang=en dir=auto data-theme=auto><head><meta charset=utf-8><meta http-equiv=X-UA-Compatible content="IE=edge"><meta name=viewport content="width=device-width,initial-scale=1,shrink-to-fit=no"><meta name=robots content="index, follow"><title>Long-Horizon VLA：任务状态、规划、执行与编排 | The Herta</title><meta name=keywords content><meta name=description content="
+机器人需要在持续交互中维护一个可靠的任务状态，并据此不断规划、执行、验证和修正。
+因此，一个比较自然的结构是：
+
+$$
+\boxed{
+\text{Task State}
+\rightarrow
+\text{Planner}
+\rightarrow
+\text{Executor}
+\rightarrow
+\text{Orchestrator / Harness}
+}
+$$
+然后环境反馈重新进入 Task State，形成闭环。
+这里很多论文都会同时跨越多个模块，所以不强行把“一篇论文”归到唯一一类。更合适的做法是：正文按问题和模块组织，论文作为跨模块案例穿插进去。
+
+
+1. Long-Horizon VLA 到底在解决什么问题？
+普通 VLA 可以粗略写成：
+$$
+(o_t,l)\rightarrow A_t
+$$其中：
+
+$o_t$：当前视觉、本体感知等 observation；
+$l$：语言任务；
+$A_t$：当前要执行的一段 action chunk。
+
+这对于局部 manipulation 已经是一个很强的范式：
+$$
+\text{当前看到什么}
++
+\text{当前要做什么}
+\rightarrow
+\text{接下来怎么动}
+$$但任务一旦变长，问题就发生变化。
+例如：
+
+整理厨房。
+
+机器人不只需要知道“现在怎么抓这个杯子”，还必须持续回答：
+
+之前已经做过什么？
+哪些任务已经完成？
+当前 subtask 做到什么程度？
+刚才那一步到底成功了吗？
+当前状态和预期是否一致？
+原来的计划还有效吗？
+现在应该继续、重试、恢复，还是重新规划？
+如果有多个未来选择，哪个更好？
+
+因此 Long-Horizon 的核心问题可以写成：
+$$
+\boxed{
+\text{如何在持续环境交互中维护一个可靠的 Task State，
+并据此持续决策？}
+}
+$$机器人其实一直都有环境反馈："><meta name=author content="LetsGetAI"><link rel=canonical href=https://letsgetai.github.io/posts/long-horizon-vla-task-state-planning-orchestration/><link crossorigin=anonymous href=/assets/css/stylesheet.4a7a0536a1692fc4d59bd621cb1b40f180c2fea7796bab2d32e27cfc03deb1b9.css integrity="sha256-SnoFNqFpL8TVm9YhyxtA8YDC/qd5a6stMuJ8/APesbk=" rel="preload stylesheet" as=style><link rel=icon href=https://letsgetai.github.io/favicon.ico><link rel=icon type=image/png sizes=16x16 href=https://letsgetai.github.io/favicon-16x16.png><link rel=icon type=image/png sizes=32x32 href=https://letsgetai.github.io/favicon-32x32.png><link rel=apple-touch-icon href=https://letsgetai.github.io/apple-touch-icon.png><link rel=mask-icon href=https://letsgetai.github.io/safari-pinned-tab.svg><meta name=theme-color content="#2e2e33"><meta name=msapplication-TileColor content="#2e2e33"><link rel=alternate hreflang=en href=https://letsgetai.github.io/posts/long-horizon-vla-task-state-planning-orchestration/><noscript><style>#theme-toggle,.top-link{display:none}</style><style>@media(prefers-color-scheme:dark){:root{--theme:rgb(29, 30, 32);--entry:rgb(46, 46, 51);--primary:rgb(218, 218, 219);--secondary:rgb(155, 156, 157);--tertiary:rgb(65, 66, 68);--content:rgb(196, 196, 197);--code-block-bg:rgb(46, 46, 51);--code-bg:rgb(55, 56, 62);--border:rgb(51, 51, 51);color-scheme:dark}.list{background:var(--theme)}.toc{background:var(--entry)}}</style></noscript><script>localStorage.getItem("pref-theme")==="dark"?document.querySelector("html").dataset.theme="dark":localStorage.getItem("pref-theme")==="light"?document.querySelector("html").dataset.theme="light":window.matchMedia("(prefers-color-scheme: dark)").matches?document.querySelector("html").dataset.theme="dark":document.querySelector("html").dataset.theme="light"</script><link rel=stylesheet href=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css><script defer src=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js></script><script defer src=https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js onload='renderMathInElement(document.body,{delimiters:[{left:"$$",right:"$$",display:!0},{left:"$",right:"$",display:!1}]})'></script><script src=https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js></script><script>mermaid.initialize({startOnLoad:!0,theme:"default",flowchart:{useMaxWidth:!0}})</script><meta property="og:url" content="https://letsgetai.github.io/posts/long-horizon-vla-task-state-planning-orchestration/"><meta property="og:site_name" content="The Herta"><meta property="og:title" content="Long-Horizon VLA：任务状态、规划、执行与编排"><meta property="og:description" content="机器人需要在持续交互中维护一个可靠的任务状态，并据此不断规划、执行、验证和修正。
+因此，一个比较自然的结构是：
+$$ \boxed{ \text{Task State} \rightarrow \text{Planner} \rightarrow \text{Executor} \rightarrow \text{Orchestrator / Harness} } $$ 然后环境反馈重新进入 Task State，形成闭环。
+这里很多论文都会同时跨越多个模块，所以不强行把“一篇论文”归到唯一一类。更合适的做法是：正文按问题和模块组织，论文作为跨模块案例穿插进去。
+1. Long-Horizon VLA 到底在解决什么问题？ 普通 VLA 可以粗略写成：
+$$ (o_t,l)\rightarrow A_t $$其中：
+$o_t$：当前视觉、本体感知等 observation； $l$：语言任务； $A_t$：当前要执行的一段 action chunk。 这对于局部 manipulation 已经是一个很强的范式：
+$$ \text{当前看到什么} + \text{当前要做什么} \rightarrow \text{接下来怎么动} $$但任务一旦变长，问题就发生变化。
+例如：
+整理厨房。
+机器人不只需要知道“现在怎么抓这个杯子”，还必须持续回答：
+之前已经做过什么？ 哪些任务已经完成？ 当前 subtask 做到什么程度？ 刚才那一步到底成功了吗？ 当前状态和预期是否一致？ 原来的计划还有效吗？ 现在应该继续、重试、恢复，还是重新规划？ 如果有多个未来选择，哪个更好？ 因此 Long-Horizon 的核心问题可以写成：
+$$ \boxed{ \text{如何在持续环境交互中维护一个可靠的 Task State， 并据此持续决策？} } $$机器人其实一直都有环境反馈："><meta property="og:locale" content="zh_cn"><meta property="og:type" content="article"><meta property="article:section" content="posts"><meta property="article:published_time" content="2026-10-18T00:00:00+08:00"><meta property="article:modified_time" content="2026-10-18T00:00:00+00:00"><meta name=twitter:card content="summary"><meta name=twitter:title content="Long-Horizon VLA：任务状态、规划、执行与编排"><meta name=twitter:description content="机器人需要在持续交互中维护一个可靠的任务状态，并据此不断规划、执行、验证和修正。
+因此，一个比较自然的结构是：
+$$ \boxed{ \text{Task State} \rightarrow \text{Planner} \rightarrow \text{Executor} \rightarrow \text{Orchestrator / Harness} } $$ 然后环境反馈重新进入 Task State，形成闭环。
+这里很多论文都会同时跨越多个模块，所以不强行把“一篇论文”归到唯一一类。更合适的做法是：正文按问题和模块组织，论文作为跨模块案例穿插进去。
+1. Long-Horizon VLA 到底在解决什么问题？ 普通 VLA 可以粗略写成：
+$$ (o_t,l)\rightarrow A_t $$其中：
+$o_t$：当前视觉、本体感知等 observation； $l$：语言任务； $A_t$：当前要执行的一段 action chunk。 这对于局部 manipulation 已经是一个很强的范式：
+$$ \text{当前看到什么} + \text{当前要做什么} \rightarrow \text{接下来怎么动} $$但任务一旦变长，问题就发生变化。
+例如：
+整理厨房。
+机器人不只需要知道“现在怎么抓这个杯子”，还必须持续回答：
+之前已经做过什么？ 哪些任务已经完成？ 当前 subtask 做到什么程度？ 刚才那一步到底成功了吗？ 当前状态和预期是否一致？ 原来的计划还有效吗？ 现在应该继续、重试、恢复，还是重新规划？ 如果有多个未来选择，哪个更好？ 因此 Long-Horizon 的核心问题可以写成：
+$$ \boxed{ \text{如何在持续环境交互中维护一个可靠的 Task State， 并据此持续决策？} } $$机器人其实一直都有环境反馈："><script type=application/ld+json>{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"Posts","item":"https://letsgetai.github.io/posts/"},{"@type":"ListItem","position":2,"name":"Long-Horizon VLA：任务状态、规划、执行与编排","item":"https://letsgetai.github.io/posts/long-horizon-vla-task-state-planning-orchestration/"}]}</script><script type=application/ld+json>{"@context":"https://schema.org","@type":"BlogPosting","headline":"Long-Horizon VLA：任务状态、规划、执行与编排","name":"Long-Horizon VLA：任务状态、规划、执行与编排","description":" 机器人需要在持续交互中维护一个可靠的任务状态，并据此不断规划、执行、验证和修正。\n因此，一个比较自然的结构是：\n$$ \\boxed{ \\text{Task State} \\rightarrow \\text{Planner} \\rightarrow \\text{Executor} \\rightarrow \\text{Orchestrator / Harness} } $$ 然后环境反馈重新进入 Task State，形成闭环。\n这里很多论文都会同时跨越多个模块，所以不强行把“一篇论文”归到唯一一类。更合适的做法是：正文按问题和模块组织，论文作为跨模块案例穿插进去。\n1. Long-Horizon VLA 到底在解决什么问题？ 普通 VLA 可以粗略写成：\n$$ (o_t,l)\\rightarrow A_t $$其中：\n$o_t$：当前视觉、本体感知等 observation； $l$：语言任务； $A_t$：当前要执行的一段 action chunk。 这对于局部 manipulation 已经是一个很强的范式：\n$$ \\text{当前看到什么} + \\text{当前要做什么} \\rightarrow \\text{接下来怎么动} $$但任务一旦变长，问题就发生变化。\n例如：\n整理厨房。\n机器人不只需要知道“现在怎么抓这个杯子”，还必须持续回答：\n之前已经做过什么？ 哪些任务已经完成？ 当前 subtask 做到什么程度？ 刚才那一步到底成功了吗？ 当前状态和预期是否一致？ 原来的计划还有效吗？ 现在应该继续、重试、恢复，还是重新规划？ 如果有多个未来选择，哪个更好？ 因此 Long-Horizon 的核心问题可以写成：\n$$ \\boxed{ \\text{如何在持续环境交互中维护一个可靠的 Task State， 并据此持续决策？} } $$机器人其实一直都有环境反馈：\n","keywords":[],"articleBody":" 机器人需要在持续交互中维护一个可靠的任务状态，并据此不断规划、执行、验证和修正。\n因此，一个比较自然的结构是：\n$$ \\boxed{ \\text{Task State} \\rightarrow \\text{Planner} \\rightarrow \\text{Executor} \\rightarrow \\text{Orchestrator / Harness} } $$ 然后环境反馈重新进入 Task State，形成闭环。\n这里很多论文都会同时跨越多个模块，所以不强行把“一篇论文”归到唯一一类。更合适的做法是：正文按问题和模块组织，论文作为跨模块案例穿插进去。\n1. Long-Horizon VLA 到底在解决什么问题？ 普通 VLA 可以粗略写成：\n$$ (o_t,l)\\rightarrow A_t $$其中：\n$o_t$：当前视觉、本体感知等 observation； $l$：语言任务； $A_t$：当前要执行的一段 action chunk。 这对于局部 manipulation 已经是一个很强的范式：\n$$ \\text{当前看到什么} + \\text{当前要做什么} \\rightarrow \\text{接下来怎么动} $$但任务一旦变长，问题就发生变化。\n例如：\n整理厨房。\n机器人不只需要知道“现在怎么抓这个杯子”，还必须持续回答：\n之前已经做过什么？ 哪些任务已经完成？ 当前 subtask 做到什么程度？ 刚才那一步到底成功了吗？ 当前状态和预期是否一致？ 原来的计划还有效吗？ 现在应该继续、重试、恢复，还是重新规划？ 如果有多个未来选择，哪个更好？ 因此 Long-Horizon 的核心问题可以写成：\n$$ \\boxed{ \\text{如何在持续环境交互中维护一个可靠的 Task State， 并据此持续决策？} } $$机器人其实一直都有环境反馈：\n$$ a_t \\rightarrow \\text{environment} \\rightarrow o_{t+1} $$问题并不是“有没有反馈”。\n真正的问题是：\n$$ \\boxed{ \\text{raw observation 能不能被持续转化成对长期决策有用的任务状态？} } $$这就是后面 Memory、Progress、Verification、Recovery、Replanning 等模块逐渐出现的原因。\n2. 总体框架：四个模块 目前看下来，可以把 Long-Horizon VLA 压成四个模块：\n$$ \\boxed{ \\text{Task State} \\rightarrow \\text{Planner} \\rightarrow \\text{Executor} \\rightarrow \\text{Orchestrator} } $$它们不是严格独立的系统组件，更像四类功能。\nTask State 回答：\n我现在到底是什么情况？\n包括：\n当前世界状态； 过去发生过什么； 哪些任务已经完成； 当前做到哪里； 当前是否失败； 当前 belief 是否需要修正。 Planner 回答：\n基于当前任务状态，下一步应该做什么？\n包括：\ngoal decomposition； subgoal generation； remaining-plan prediction； replanning； world-model look-ahead； value / search。 Executor 回答：\n已经决定做什么以后，具体应该怎么动？\n这基本就是前面 VLA / imitation policy 讨论的部分：\n$$ z_t\\rightarrow A_t $$例如：\naction chunk； Diffusion Policy； flow matching； VLA Action Expert。 Orchestrator / Harness 回答：\nPlanner 和 Executor 如何稳定地闭环工作？\n包括：\ntermination； switching； verification； retry； rollback； forward recovery； return-to-planner。 这里面很多东西确实更像是当前 VLA 能力不足时的 execution harness，而不完全等于传统意义上的 planning。\nPart I：Task State 3. 为什么当前 Observation 不够？ Long-Horizon manipulation 很多时候并不是仅凭当前 observation 就能决策的。\n如果 policy 只有：\n$$ \\pi(a_t|o_t,l) $$就默认当前 observation 已经包含所有决策需要的信息。\n但很多任务显然不满足这一点。\n例如：\nBlue → Pink → Green，依次按按钮。\n当前图像里三个按钮都还存在。\n只看：\n$$ o_t $$可能无法知道：\nBlue 还没按； Blue 已经按过，现在应该按 Pink； Blue 和 Pink 都按过，现在应该按 Green。 所以真正需要的是：\n$$ o_{1:t} $$中与当前任务有关的信息。\n这也是为什么 Long-Horizon 中的第一类工作通常从 Memory 开始。\n4. Memory：过去的信息怎么留下来？ 4.1 MemoryVLA：从当前 observation 到带历史的内部状态 MemoryVLA 的核心问题是：\n$$ \\boxed{ \\text{当前 observation 不足以决定当前 action} } $$因此它把当前 representation 分成两部分：\n$$ \\boxed{ \\text{Perceptual Memory} + \\text{Cognitive Memory} } $$其中：\nPerceptual Memory 保留低层视觉细节； Cognitive Memory 保留更高层的语义信息。 它没有简单地把所有历史 frame 全部塞进 context，而是做：\n$$ \\boxed{ \\text{Retrieve} \\rightarrow \\text{Fuse} \\rightarrow \\text{Consolidate} } $$也就是：\n当前状态去历史 memory 中检索相关内容； 当前信息和历史信息做 gated fusion； 相似、冗余的 memory 进行压缩。 因此内部状态可以粗略写成：\n$$ b_t=f(o_t,M_{t-1}) $$然后：\n$$ a_t\\sim\\pi(a_t|b_t,l) $$这里最重要的不是某个具体 attention 结构，而是一个认识：\n$$ \\boxed{ \\text{Memory 不是单纯把 Context Window 拉长} } $$真正的问题是：\n$$ \\boxed{ \\text{存什么、什么时候取、怎么融合、怎么压缩} } $$4.2 HELM：Memory 也可以是显式 Episodic Memory HELM 的做法和 MemoryVLA 不一样。\n它更接近显式 episodic memory：\n$$ \\mathcal M=\\{(k_i,v_i)\\} $$memory 中记录：\n关键 observation； 当时执行的 subgoal； success / failure； 时间； compact state delta。 而且不是每一帧都存，而是优先记录：\n$$ \\boxed{ \\text{subgoal success} ,\\quad \\text{failure} ,\\quad \\text{checkpoint} } $$这说明 Memory 也可以从：\n$$ \\text{latent feature memory} $$走向：\n$$ \\boxed{ \\text{event-oriented episodic memory} } $$这两个方向现在都还存在，没有统一。\n5. Memory 还不够：还需要知道当前做到哪里 即使模型记住了过去，仍然存在一个问题：\n$$ \\boxed{ \\text{“我记得发生过什么”} \\neq \\text{“我知道当前做到哪里”} } $$例如：\n把杯子放进抽屉。\n执行过程中可能经历：\n$$ \\text{还没抓} \\rightarrow \\text{已经抓住} \\rightarrow \\text{移动中} \\rightarrow \\text{已经放进去} \\rightarrow \\text{可以松手} $$当前 task phase 本身就是一个重要状态变量。\n6. Progress：显式表示当前执行进程 6.1 PALM：连续的 progress state PALM 显式加入：\n$$ p_t\\in[0,1] $$表示当前 subtask 的进度。\n于是 task state 不再只是：\n$$ (o_t,M_t) $$而开始包含：\n$$ \\boxed{ (o_t,M_t,p_t) } $$PALM 同时还预测：\n当前应该关注什么 object； 什么区域适合 contact； 什么区域适合 placement； 接下来应该发生什么 motion。 也就是：\n$$ \\boxed{ \\text{Affordance State} + \\text{Progress State} } $$这里一个重要变化是：\nProgress 不只是为了让模型“知道时间过去了多久”，而是让它区分当前处于任务的哪个 phase。\n例如两个 observation 很像：\n$$ o_i\\approx o_j $$但：\n$$ p_i=0.2,\\qquad p_j=0.9 $$对应的动作可能完全不同。\n6.2 Progress 还可以用于 Termination PALM 进一步把 progress 用于：\n$$ \\boxed{ \\text{什么时候结束当前 skill} } $$例如：\n$$ p_t\u003e\\phi $$就触发 subtask transition。\n这说明一个变量可以跨模块发挥作用：\n在 Task State 里，$p_t$ 表示进度； 在 Orchestrator 里，$p_t$ 又可以决定何时切换。 这也说明：论文和模块不是一一对应关系。\n7. 从 Latent State 到 Structured Task State MemoryVLA 和 PALM 更偏隐式 latent representation。\n但进入更复杂的 Planner 后，很多工作开始显式维护 task state。\n7.1 Goal2Skill：Precondition / Postcondition Goal2Skill 不再把一个 subtask 只表示成：\n$$ z_k=\\text{“pick up cup”} $$而是包含：\n$$ \\tau_k= ( \\ell_k, \\operatorname{pre}_k, \\operatorname{post}_k, ...) $$这意味着一个 subtask 同时定义：\n$$ \\boxed{ \\text{什么时候可以执行} + \\text{什么叫执行成功} } $$于是执行后可以比较：\n$$ \\boxed{ \\text{Expected State} \\overset{?}{=} \\text{Observed State} } $$Task State 开始变得：\n$$ \\boxed{ \\text{structured} + \\text{verifiable} } $$而不是只有一个神经网络 latent。\n7.2 LoHo-Manip：Done + Remaining LoHo-Manip 又给出一个更简单的 task-state 表示：\n$$ \\boxed{ b_t=[\\text{Done},\\text{Remaining},\\text{Current Visual Trace}]} $$它不追求显式维护完整 symbolic world state。\n而是只保留：\n哪些已经完成、哪些还剩。\n这是一种非常 task-oriented 的 state abstraction。\n7.3 $\\tau_0$-VLA：Memory 本身也可能错 更进一步，$\\tau_0$-VLA 开始考虑：\n$$ \\boxed{ \\text{Memory / Task State 本身可能不正确} } $$例如：\nmemory 落后于真实状态； memory 比真实状态提前； memory 和当前 observation 发生冲突。 这时候需要：\n$$ (o_t,M_{t-1}) \\rightarrow M_t^{corrected} $$也就是：\n$$ \\boxed{ \\text{Task-State Revision} } $$这已经比“把历史留下来”更接近一个真正的 belief update 问题。\n8. Task State 这一条线可以怎么理解？ 从目前这些工作看，可以粗略写成：\n$$ \\boxed{o_t} $$↓\n$$ \\boxed{(o_t,M_t)} $$Memory\n↓\n$$ \\boxed{(o_t,M_t,p_t)} $$Progress\n↓\n$$ \\boxed{ b_t=[\\text{history},\\text{progress},\\text{done},\\text{remaining},\\text{failure},...]} $$Structured Task State\n↓\n$$ \\boxed{ b_t\\xrightarrow{\\text{new evidence}}b_{t+1}} $$State Revision\n真正稳定的问题不是“到底应该用 Memory Bank 还是自然语言 summary”。\n而是：\n$$ \\boxed{ \\text{一个长期 agent 到底需要维护什么 Task State？ 这个状态怎么根据新 observation 持续修正？} } $$ Part II：Planner 9. 有了 Task State，下一步才是 Planning 假设已经有：\n$$ b_t $$以及最终目标：\n$$ g $$Planner 要解决：\n$$ \\boxed{ P(b_t,g)\\rightarrow z_t } $$其中：\n$$ z_t $$是下一个 semantic subgoal / skill。\n这部分可以从简单到复杂分成几个层次。\n10. 第一层：Goal Decomposition 最简单的 Planner：\n$$ g\\rightarrow[z_1,z_2,\\ldots,z_K] $$例如：\n整理桌子。\n拆成：\n$$ \\text{pick cup} \\rightarrow \\text{place cup} \\rightarrow \\text{pick plate} \\rightarrow \\text{place plate} $$这已经能显著降低低层 VLA 的有效 horizon。\nVLA 不再需要直接解决：\n$$ \\text{十分钟任务} $$而只需要不断解决：\n$$ \\boxed{ \\text{几秒钟级别的局部 skill} } $$这也是 Hierarchical VLA 的基本逻辑。\n11. 第二层：Closed-Loop Replanning 一次生成完整计划并执行到底并不可靠。\n因为执行结果会改变环境：\n$$ b_t\\xrightarrow{z_t}b_{t+1} $$而真实：\n$$ b_{t+1} $$可能和计划中的预期不同。\n11.1 Goal2Skill：反馈真正修改 Future Plan Goal2Skill 的闭环是：\n$$ \\text{Plan} \\rightarrow \\text{Execute} \\rightarrow \\text{Observe} \\rightarrow \\text{Verify} \\rightarrow \\text{Update State} \\rightarrow \\text{Revise Plan} $$如果当前 subtask 失败，reflection 可以得到：\n$$ \\boxed{ \\text{retry} \\quad/\\quad \\text{adjust} \\quad/\\quad \\text{replan} } $$这里第一次比较明确地出现：\n$$ \\boxed{ \\text{feedback 不只是触发 retry， 而是可以修改后续计划本身} } $$ 12. 第三层：Receding-Horizon Task Planning 12.1 LoHo-Manip：Done + Remaining Goal2Skill 更像：\n$$ \\text{维护一份计划，然后修它} $$LoHo-Manip 则换了一种思路：\n每次看到新的 observation，重新判断“已经做完什么、剩下什么”。\n即：\n$$ (o_t,g) \\rightarrow [ \\text{Done}, \\text{Remaining} ] $$执行一点以后：\n$$ o_{t+1} $$再次：\n$$ (o_{t+1},g) \\rightarrow [ \\text{Done}', \\text{Remaining}' ] $$从控制思想上看，这和 MPC 很相似：\n$$ \\boxed{ \\text{Plan} \\rightarrow \\text{Execute Locally} \\rightarrow \\text{Observe} \\rightarrow \\text{Replan} } $$区别是这里的 planning variable 不再是低层连续 action：\n$$ a_t,a_{t+1},\\ldots $$而是：\n$$ \\boxed{ \\text{semantic task sequence} } $$因此可以把它理解成：\n$$ \\boxed{ \\text{Task-Level Receding Horizon} } $$ 13. 第四层：Counterfactual Planning 前面的 Planner 虽然会不断 replanning，但大多数情况下仍然是：\n$$ (b_t,g) \\xrightarrow{\\text{one forward}} z_t $$也就是：\n看见当前状态，直接猜下一步。\n但这和经典 planning 仍然有差别。\n真正的 look-ahead 应该是：\n$$ z_A\\rightarrow\\hat b_A $$$$ z_B\\rightarrow\\hat b_B $$然后比较：\n$$ V(\\hat b_A),V(\\hat b_B) $$再决定。\n14. $\\tau_0$-VLA：World Model 被重新拿回 Planner $\\tau_0$-VLA 把高层 decision 显式写成 search。\n先生成候选：\n$$ z_1,\\ldots,z_N $$World Model：\n$$ (o_t,z_i) \\rightarrow \\hat o_i $$预测：\n如果执行这个 semantic subgoal，完成以后世界大概是什么样。\n然后 Value Model：\n$$ V(g,z_i,\\hat o_i) $$评价：\n这个未来对最终任务好不好。\n于是出现：\n$$ \\boxed{ \\text{Propose} \\rightarrow \\text{Imagine} \\rightarrow \\text{Evaluate} \\rightarrow \\text{Choose} } $$再配合 beam search：\n$$ z_1 \\rightarrow \\hat o_1 \\rightarrow z_2 \\rightarrow \\hat o_2 \\rightarrow \\cdots $$这才真正回到我们之前学过的：\n$$ \\boxed{ \\text{Prediction} + \\text{Evaluation} + \\text{Search} } $$只不过 planning variable 从低层 action 变成了：\n$$ \\boxed{ \\text{semantic subgoal} } $$ 15. World Model 在这里应该怎么定位？ World Model 不一定要作为第五个和 Planner 平级的模块。\n在目前这类 Long-Horizon 工作里，更自然的理解是：\n$$ \\boxed{ \\text{World Model 是 Planner 内部的 Look-Ahead Mechanism} } $$普通 Planner：\n$$ b_t\\rightarrow z_t $$加入 World Model：\n$$ b_t \\rightarrow \\{z_i\\} \\rightarrow \\{\\hat b_i\\} \\rightarrow \\{V_i\\} \\rightarrow z^* $$也就是：\n$$ \\boxed{ \\text{Proposal} + \\text{World Model} + \\text{Value} + \\text{Search} } $$这也把 World Model 和 VLA 两条路线真正重新接上了。\nPart III：Executor 16. Executor 在 Long-Horizon 中的位置反而更明确了 Planner 决定：\n$$ z_t=\\text{“pick up the cup”} $$Executor 负责：\n$$ (o_t,z_t)\\rightarrow A_t $$其中：\n$$ A_t=[a_t,\\ldots,a_{t+H-1}] $$这一部分就是前面 VLA 笔记已经展开过的：\nBehavior Cloning； Action Chunking； Diffusion Policy； Flow Matching； VLA Action Expert。 所以在这篇笔记里不需要重新详细展开。\nLong-Horizon 只是把 VLA 的位置变得更清楚：\n$$ \\boxed{ \\text{VLA = Local Skill Executor} } $$ 17. Planner → Executor 的 Interface 本身也是一个问题 虽然 Executor 不需要重讲，但 Planner 如何向 Executor 表达 intention 很重要。\n17.1 Language Subgoal 最常见：\n$$ z_t=\\text{“pick up the cup”} $$优点是语义清楚。\n缺点是 spatial grounding 可能不够。\n17.2 Visual Trace LoHo-Manip 加入：\n$$ \\gamma_t=[(x_1,y_1),\\ldots,(x_k,y_k)] $$告诉 Executor：\n大概沿图像哪个方向运动。\n于是 interface 变成：\n$$ \\boxed{ \\text{Language} + \\text{Visual Trace} } $$也就是：\n做什么 + 大概往哪里做。\n17.3 Visual Subgoal $\\pi_{0.7}$ 等工作进一步使用：\n$$ \\hat o_{\\text{subgoal}} $$表示：\n当前 subtask 完成以后，世界应该长什么样。\n于是 Executor 可以解决：\n$$ (o_{\\text{current}},o_{\\text{subgoal}}) \\rightarrow A $$这有一点 inverse dynamics 的味道。\n所以 Planner → Executor interface 目前也没有统一：\n$$ \\boxed{ \\text{Language} \\quad vs\\quad \\text{Visual Trace} \\quad vs\\quad \\text{Visual Subgoal} } $$ Part IV：Orchestration / Harness 18. 为什么单纯 Planner + VLA 还不够？ 一个 naive hierarchy：\n$$ \\text{Planner} \\rightarrow z_t \\rightarrow \\text{VLA} $$仍然有一堆 execution-level 问题：\n当前 skill 应该执行多久？ 什么时候把控制权还给 Planner？ 当前动作真的合理吗？ 当前 subgoal 真的完成了吗？ 失败以后是 retry 还是 replan？ 这些问题本身不完全属于 Planning。\n它们更像：\n$$ \\boxed{ \\text{Orchestration / Harness} } $$ 19. Termination：什么时候结束当前 Skill？ 如果 Planner 给：\n$$ z_t=\\text{pick cup} $$VLA 到底执行多久？\n可能有几种方案。\nFixed Duration $$ T=8s $$时间到了就切换。\nPredicted Duration Planner 事先预测：\n这个 skill 大概执行 6 秒。\nSuccess-Based Termination 真正检测：\n$$ \\boxed{ \\text{subgoal 是否完成} } $$Hi-VLA systematic study 在长时程与推理任务上的评估支持：\n$$ \\boxed{ \\text{success-based switching} } $$比纯 time-driven 更可靠；这组实验中的成功检测使用了仿真器特权状态。\nPALM 则用：\n$$ p_t\u003e\\phi $$把 progress 和 termination 连起来。\n20. Verification：模型提出的动作到底该不该执行？ 普通 VLA：\n$$ o_t\\rightarrow a_t\\rightarrow\\text{execute} $$HELM 在中间加入：\n$$ \\boxed{ P(\\text{failure}|o_t,a_t,g_t,M_t) } $$也就是说：\n当前这个 proposed action，在当前任务上下文里会不会出错？\n这里很重要的一点是：\n$$ \\boxed{ \\text{Action 是否正确，取决于 Task History} } $$例如：\nput mug in cabinet\n如果 mug 已经放进去过，这个动作即使几何上可行，在 task-level 也是错误的。\n所以 Verifier 实际是在利用：\n$$ \\text{Current State} + \\text{Memory} + \\text{Task} $$判断：\n$$ \\text{Action Validity} $$ 21. Recovery：发现错了以后怎么办？ 知道：\n$$ \\text{failure=True} $$还不够。\n系统还要选择：\n$$ \\boxed{ \\text{retry} ,\\quad \\text{rollback} ,\\quad \\text{forward recovery} ,\\quad \\text{return to planner} } $$21.1 Retry 偶然 grasp 失败：\n$$ \\text{retry same skill} $$21.2 Rollback HELM 的仿真实验中可以回到最近成功 checkpoint：\n$$ s'_t\\rightarrow s_{\\text{checkpoint}} $$然后重新执行当前 subgoal。\n21.3 Forward Recovery 物理环境很多时候无法真的 rollback。\n例如杯子已经掉到了新的位置。\n这时：\n$$ s'_t \\rightarrow \\text{new recovery behavior} $$也就是从当前 corrupted state 往前恢复。HELM-Fwd 是 HELM 针对无法回滚的情形设计的前向恢复变体。\n21.4 Return to Planner 如果局部 recovery 已经解决不了：\n$$ \\boxed{ \\text{Harness} \\rightarrow \\text{Planner} } $$让高层重新规划未来任务。\n所以 Orchestrator 最核心的问题其实是：\n$$ \\boxed{ \\text{什么时候局部处理， 什么时候必须重新高层决策？} } $$ 22. 四个模块之间真正困难的是 Interface 这些论文之所以高度耦合，根本原因是：\n$$ \\boxed{ \\text{Long-Horizon 的难点不只在模块本身， 更在模块之间的信息接口。} } $$Task State → Planner $$ b_t\\rightarrow z_t $$问题：\n什么样的 task state 才足够支持高层决策？\nMemoryVLA、PALM、Goal2Skill、LoHo-Manip、$\\tau_0$ 都给了不同答案。\nPlanner → Executor $$ z_t\\rightarrow A_t $$问题：\n高层 intention 应该用什么 representation 传给低层？\n可能是：\n$$ \\text{language} $$也可能是：\n$$ \\text{visual trace} $$或者：\n$$ \\text{visual subgoal} $$Executor → Task State 执行以后：\n$$ A_t\\rightarrow o_{t+1} $$然后需要得到：\n$$ \\boxed{ \\text{success / progress / failure / new task state} } $$PALM、HELM、Goal2Skill 都在研究这个接口。\nTask State → World Model → Planner 如果 Planner 需要 look-ahead：\n$$ (b_t,z_i) \\rightarrow \\hat b_{t+1}^{(i)} $$然后：\n$$ V(\\hat b_{t+1}^{(i)}) $$这是 $\\tau_0$-VLA 等工作开始研究的接口。\n23. 两种闭环 到目前为止，Long-Horizon 系统里其实出现了两类不同的闭环。\n23.1 Reality Loop 机器人真的执行：\n$$ \\boxed{ \\text{Plan} \\rightarrow \\text{Act} \\rightarrow \\text{Observe} \\rightarrow \\text{Update State} \\rightarrow \\text{Recover / Replan} } $$MemoryVLA、PALM、HELM、Goal2Skill、LoHo-Manip 主要都在不同程度上补这个 loop。\n它的特点是：\n$$ \\boxed{ \\text{先进入真实世界，再根据真实反馈修正} } $$23.2 Imagination Loop World Model 加入以后：\n$$ \\boxed{ \\text{Propose} \\rightarrow \\text{Imagine} \\rightarrow \\text{Evaluate} \\rightarrow \\text{Choose} } $$这发生在真正执行之前。\n也就是：\n$$ \\boxed{ \\text{Counterfactual Planning} } $$这时候 Agent 不只是：\n做错以后改。\n而开始：\n做之前先比较几个未来。\n这才比较接近我们传统意义上的 planning。\n24. Paper × Module 对应关系 这些论文大多跨多个模块，因此更适合用“主贡献 / 次贡献”的方式理解。\nPaper Task State Planner Executor Orchestrator / Harness Hi-VLA Systematic Study 次：observation / memory 次：VLM planner 次：VLA controller 主：termination / orchestration MemoryVLA 主：perceptual + cognitive memory 次：memory-conditioned action PALM 主：progress + affordance 次：diffusion action 次：progress-based termination HELM 次：episodic memory 次：base VLA 主：verification + recovery Goal2Skill 主：structured memory + pre/post state 主：reflection / replanning 次：skill executor 主：verification / retry / adjust LoHo-Manip 次：Done + Remaining 主：receding-horizon replanning 次：visual-trace conditioned VLA 次：implicit recovery $\\tau_0$-VLA 次：memory correction 主：world model + value + search 次：flow-based VLA 次 这里最重要的不是表格本身，而是承认：\n$$ \\boxed{ \\text{Paper}\\neq\\text{Module} } $$一篇系统论文完全可能同时研究：\n$$ \\text{Task State} + \\text{Planner} + \\text{Verification} $$正文应该围绕模块写，论文只是不同模块上的案例。\n25. Paper Cards 下面只保留每篇论文最值得记住的角色，避免正文变成论文流水账。\nHi-VLA Systematic Study 核心问题 $$ \\boxed{ \\text{Planner + VLA 到底应该怎么 orchestration？} } $$主要涉及 Planner capability； low-level VLA steerability； observation representation； memory； termination / switching。 最重要的认识 $$ \\boxed{ \\text{仅仅加一个 VLM Planner 不够， Planner 和 Executor 之间怎么闭环本身非常重要。} } $$ MemoryVLA 核心问题 $$ \\boxed{ \\text{当前 observation 不足时，历史怎么进入 policy？} } $$主要涉及 perceptual memory； cognitive memory； retrieval； gated fusion； consolidation。 最重要的认识 $$ \\boxed{ \\text{Memory 不是简单增加 context length， 而是构造 task-relevant history representation。} } $$ PALM 核心问题 $$ \\boxed{ \\text{当前 subtask 做到哪里了？} } $$主要涉及 affordance foresight； continuous progress； progress-conditioned action； progress-based switching。 最重要的认识 $$ \\boxed{ \\text{Task State 不只需要 history， 还需要 phase / progress。} } $$ HELM 核心问题 $$ \\boxed{ \\text{VLA 提出的动作可能错，怎么提前发现并恢复？} } $$主要涉及 episodic memory； state/action verifier； rollback； forward recovery。 最重要的认识 $$ \\boxed{ \\text{Action 是否合理依赖 task history； 发现错误以后还必须有 recovery mechanism。} } $$ Goal2Skill 核心问题 $$ \\boxed{ \\text{执行反馈怎么真正修改 future plan？} } $$主要涉及 structured memory； precondition； postcondition； verification； reflection； retry / adjust / replan。 最重要的认识 $$ \\boxed{ \\text{反馈不只是用来 retry， 而是可以改变整个后续计划。} } $$ LoHo-Manip 核心问题 $$ \\boxed{ \\text{为什么要死守第一次生成的 Todo List？} } $$主要涉及 Done / Remaining； receding-horizon task planning； visual trace； implicit recovery。 最重要的认识 $$ \\boxed{ \\text{每次根据最新状态重新预测剩余任务， 可以把 task planning 做成闭环。} } $$ $\\tau_0$-VLA 核心问题 $$ \\boxed{ \\text{为什么一定要执行以后才知道 subgoal 选错？ 能不能先预测不同未来再选择？} } $$主要涉及 memory correction； candidate subgoal generation； world model； value model； beam search； test-time computation。 最重要的认识 $$ \\boxed{ \\text{Planner 开始从直接猜下一步， 转向“预测未来 + 评价 + 搜索”。} } $$这时 World Model 真正重新进入 planning loop。\n26. 哪些更像真正的长期问题，哪些更像当前 Harness？ 当前这些模块里，有一部分问题比较基础：\n$$ \\boxed{ \\text{Partial Observability / Memory} } $$$$ \\boxed{ \\text{Task State} } $$$$ \\boxed{ \\text{Progress} } $$$$ \\boxed{ \\text{Temporal Abstraction} } $$$$ \\boxed{ \\text{Uncertainty} } $$$$ \\boxed{ \\text{Credit / Value} } $$$$ \\boxed{ \\text{Counterfactual Future} } $$这些即使 base VLA 继续变强，也不会简单消失。\n它们可能被更大的模型隐式吸收，但问题本身仍然存在。\n另一方面：\n某个特定 failure classifier； 某套 rollback rule； 某种 prompt state machine； 某个 handcrafted success detector； 更可能是：\n$$ \\boxed{ \\text{当前 Base VLA 不够可靠时的阶段性 Harness} } $$因此当前很多系统都有双重性质：\n$$ \\boxed{ \\text{Harness} = \\text{真正必要的 Agent Mechanism} + \\text{对当前 Base Model 的能力补丁} } $$现在这两者还没有完全分开。\n27. 暂时的理解 如果把这一轮 Long-Horizon 阅读压成一句话：\n普通 VLA 主要解决：\n$$ \\boxed{ \\text{“当前该怎么动？”} } $$而 Long-Horizon 系统开始补：\n$$ \\boxed{ \\text{“我现在到底是什么任务状态？”} } $$$$ \\boxed{ \\text{“接下来应该做什么？”} } $$$$ \\boxed{ \\text{“当前执行是不是仍然正确？”} } $$$$ \\boxed{ \\text{“如果不正确，怎么恢复或者改计划？”} } $$以及更进一步：\n$$ \\boxed{ \\text{“在真正行动前，能不能先比较不同未来？”} } $$所以整个体系逐渐从：\n$$ (o_t,l)\\rightarrow A_t $$扩展成：\n$$ \\boxed{ \\text{Observation / History} \\rightarrow \\text{Task State} \\rightarrow \\text{Planner} \\rightarrow \\text{VLA Executor} \\rightarrow \\text{Verification / Recovery} \\rightarrow \\text{New Task State} } $$如果再加 World Model：\n$$ \\boxed{ \\text{Task State} \\rightarrow \\text{Candidate Futures} \\rightarrow \\text{Value / Search} \\rightarrow \\text{Decision} } $$这时候：\n$$ \\boxed{ \\text{VLA} + \\text{Memory} + \\text{Planning} + \\text{World Model} } $$才真正开始构成一个完整的 Long-Horizon embodied agent。\n参考论文与入口 What Matters in Orchestrating Robot Policies: A Systematic Study of Hierarchical VLA Agents\nMemoryVLA: Perceptual-Cognitive Memory in Vision-Language-Action Models for Robotic Manipulation\nPALM: Progress-Aware Policy Learning via Affordance Reasoning for Long-Horizon Robotic Manipulation\nHELM: Harness-Enhanced Long-horizon Memory for Vision-Language-Action Manipulation\nGoal2Skill: Long-Horizon Manipulation with Adaptive Planning and Reflection\nLong-Horizon Manipulation via Trace-Conditioned VLA Planning（LoHo-Manip）\n$\\tau_0$-VLA: a Hierarchical Robot Foundation Model with World-Model-Guided Test-Time Computation\n","wordCount":"2123","inLanguage":"en","datePublished":"2026-10-18T00:00:00+08:00","dateModified":"2026-10-18T00:00:00Z","author":{"@type":"Person","name":"LetsGetAI"},"mainEntityOfPage":{"@type":"WebPage","@id":"https://letsgetai.github.io/posts/long-horizon-vla-task-state-planning-orchestration/"},"publisher":{"@type":"Organization","name":"The Herta","logo":{"@type":"ImageObject","url":"https://letsgetai.github.io/favicon.ico"}}}</script></head><body id=top><header class=header><nav class=header-nav><div class=logo><a href=https://letsgetai.github.io/ accesskey=h title="The Herta (Alt + H)">The Herta</a><div class=logo-switches><button id=theme-toggle class=theme-toggle accesskey=t title="(Alt + T)" aria-label="Toggle theme">
+<svg class="moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+<svg class="sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg></button></div></div><ul id=menu class=menu><li><a href=https://letsgetai.github.io/ title=首页><span>首页</span></a></li><li><a href=https://letsgetai.github.io/archives/ title=归档><span>归档</span></a></li><li><a href=https://letsgetai.github.io/about/ title=关于><span>关于</span></a></li><li><a href=https://letsgetai.github.io/categories/ title=分类><span>分类</span></a></li><li><a href=https://github.com/letsgetai title=GitHub><span>GitHub</span>&nbsp;
+<svg fill="none" shape-rendering="geometricPrecision" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewBox="0 0 24 24" height="12" width="12"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><path d="M15 3h6v6"/><path d="M10 14 21 3"/></svg></a></li></ul></nav></header><main class=main><article class=post-single><header class=post-header><nav class=breadcrumbs role=navigation aria-label=Breadcrumb><a href=/>主页</a>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"/></svg>
+<a href=/posts/>Posts</a>
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right"><polyline points="9 18 15 12 9 6"/></svg></nav><h1 class="post-title entry-hint-parent">Long-Horizon VLA：任务状态、规划、执行与编排</h1><div class=post-meta><span title='2026-10-18 00:00:00 +0000 UTC'>2026-10-18</span>&nbsp;·&nbsp;<span>10 分钟</span>&nbsp;·&nbsp;<span>2123 字</span>&nbsp;·&nbsp;<span>LetsGetAI</span></div></header><div class="post-content md-content"><blockquote><p>机器人需要在持续交互中维护一个可靠的任务状态，并据此不断规划、执行、验证和修正。</p><p>因此，一个比较自然的结构是：</p></blockquote>$$
+\boxed{
+\text{Task State}
+\rightarrow
+\text{Planner}
+\rightarrow
+\text{Executor}
+\rightarrow
+\text{Orchestrator / Harness}
+}
+$$<blockquote><p>然后环境反馈重新进入 Task State，形成闭环。</p><p>这里很多论文都会同时跨越多个模块，所以不强行把“一篇论文”归到唯一一类。更合适的做法是：<strong>正文按问题和模块组织，论文作为跨模块案例穿插进去。</strong></p></blockquote><hr><h2 id=1-long-horizon-vla-到底在解决什么问题>1. Long-Horizon VLA 到底在解决什么问题？<a hidden class=anchor aria-hidden=true href=#1-long-horizon-vla-到底在解决什么问题>#</a></h2><p>普通 VLA 可以粗略写成：</p>$$
+(o_t,l)\rightarrow A_t
+$$<p>其中：</p><ul><li>$o_t$：当前视觉、本体感知等 observation；</li><li>$l$：语言任务；</li><li>$A_t$：当前要执行的一段 action chunk。</li></ul><p>这对于局部 manipulation 已经是一个很强的范式：</p>$$
+\text{当前看到什么}
++
+\text{当前要做什么}
+\rightarrow
+\text{接下来怎么动}
+$$<p>但任务一旦变长，问题就发生变化。</p><p>例如：</p><blockquote><p>整理厨房。</p></blockquote><p>机器人不只需要知道“现在怎么抓这个杯子”，还必须持续回答：</p><ul><li>之前已经做过什么？</li><li>哪些任务已经完成？</li><li>当前 subtask 做到什么程度？</li><li>刚才那一步到底成功了吗？</li><li>当前状态和预期是否一致？</li><li>原来的计划还有效吗？</li><li>现在应该继续、重试、恢复，还是重新规划？</li><li>如果有多个未来选择，哪个更好？</li></ul><p>因此 Long-Horizon 的核心问题可以写成：</p>$$
+\boxed{
+\text{如何在持续环境交互中维护一个可靠的 Task State，
+并据此持续决策？}
+}
+$$<p>机器人其实一直都有环境反馈：</p>$$
+a_t
+\rightarrow
+\text{environment}
+\rightarrow
+o_{t+1}
+$$<p>问题并不是“有没有反馈”。</p><p>真正的问题是：</p>$$
+\boxed{
+\text{raw observation 能不能被持续转化成对长期决策有用的任务状态？}
+}
+$$<p>这就是后面 Memory、Progress、Verification、Recovery、Replanning 等模块逐渐出现的原因。</p><hr><h2 id=2-总体框架四个模块>2. 总体框架：四个模块<a hidden class=anchor aria-hidden=true href=#2-总体框架四个模块>#</a></h2><p>目前看下来，可以把 Long-Horizon VLA 压成四个模块：</p>$$
+\boxed{
+\text{Task State}
+\rightarrow
+\text{Planner}
+\rightarrow
+\text{Executor}
+\rightarrow
+\text{Orchestrator}
+}
+$$<p>它们不是严格独立的系统组件，更像四类功能。</p><h3 id=task-state>Task State<a hidden class=anchor aria-hidden=true href=#task-state>#</a></h3><p>回答：</p><blockquote><p><strong>我现在到底是什么情况？</strong></p></blockquote><p>包括：</p><ul><li>当前世界状态；</li><li>过去发生过什么；</li><li>哪些任务已经完成；</li><li>当前做到哪里；</li><li>当前是否失败；</li><li>当前 belief 是否需要修正。</li></ul><h3 id=planner>Planner<a hidden class=anchor aria-hidden=true href=#planner>#</a></h3><p>回答：</p><blockquote><p><strong>基于当前任务状态，下一步应该做什么？</strong></p></blockquote><p>包括：</p><ul><li>goal decomposition；</li><li>subgoal generation；</li><li>remaining-plan prediction；</li><li>replanning；</li><li>world-model look-ahead；</li><li>value / search。</li></ul><h3 id=executor>Executor<a hidden class=anchor aria-hidden=true href=#executor>#</a></h3><p>回答：</p><blockquote><p><strong>已经决定做什么以后，具体应该怎么动？</strong></p></blockquote><p>这基本就是<a href=https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/>前面 VLA / imitation policy 讨论的部分</a>：</p>$$
+z_t\rightarrow A_t
+$$<p>例如：</p><ul><li>action chunk；</li><li><a href=https://arxiv.org/abs/2303.04137>Diffusion Policy</a>；</li><li><a href=https://arxiv.org/abs/2210.02747>flow matching</a>；</li><li><a href=https://arxiv.org/abs/2410.24164>VLA Action Expert</a>。</li></ul><h3 id=orchestrator--harness>Orchestrator / Harness<a hidden class=anchor aria-hidden=true href=#orchestrator--harness>#</a></h3><p>回答：</p><blockquote><p><strong>Planner 和 Executor 如何稳定地闭环工作？</strong></p></blockquote><p>包括：</p><ul><li>termination；</li><li>switching；</li><li>verification；</li><li>retry；</li><li>rollback；</li><li>forward recovery；</li><li>return-to-planner。</li></ul><p>这里面很多东西确实更像是当前 VLA 能力不足时的 execution harness，而不完全等于传统意义上的 planning。</p><hr><h2 id=part-itask-state>Part I：Task State<a hidden class=anchor aria-hidden=true href=#part-itask-state>#</a></h2><h2 id=3-为什么当前-observation-不够>3. 为什么当前 Observation 不够？<a hidden class=anchor aria-hidden=true href=#3-为什么当前-observation-不够>#</a></h2><p>Long-Horizon manipulation 很多时候并不是仅凭当前 observation 就能决策的。</p><p>如果 policy 只有：</p>$$
+\pi(a_t|o_t,l)
+$$<p>就默认当前 observation 已经包含所有决策需要的信息。</p><p>但很多任务显然不满足这一点。</p><p>例如：</p><blockquote><p>Blue → Pink → Green，依次按按钮。</p></blockquote><p>当前图像里三个按钮都还存在。</p><p>只看：</p>$$
+o_t
+$$<p>可能无法知道：</p><ul><li>Blue 还没按；</li><li>Blue 已经按过，现在应该按 Pink；</li><li>Blue 和 Pink 都按过，现在应该按 Green。</li></ul><p>所以真正需要的是：</p>$$
+o_{1:t}
+$$<p>中与当前任务有关的信息。</p><p>这也是为什么 Long-Horizon 中的第一类工作通常从 Memory 开始。</p><hr><h2 id=4-memory过去的信息怎么留下来>4. Memory：过去的信息怎么留下来？<a hidden class=anchor aria-hidden=true href=#4-memory过去的信息怎么留下来>#</a></h2><h3 id=41-memoryvla从当前-observation-到带历史的内部状态>4.1 MemoryVLA：从当前 observation 到带历史的内部状态<a hidden class=anchor aria-hidden=true href=#41-memoryvla从当前-observation-到带历史的内部状态>#</a></h3><p><a href=https://arxiv.org/abs/2508.19236>MemoryVLA</a> 的核心问题是：</p>$$
+\boxed{
+\text{当前 observation 不足以决定当前 action}
+}
+$$<p>因此它把当前 representation 分成两部分：</p>$$
+\boxed{
+\text{Perceptual Memory}
++
+\text{Cognitive Memory}
+}
+$$<p>其中：</p><ul><li>Perceptual Memory 保留低层视觉细节；</li><li>Cognitive Memory 保留更高层的语义信息。</li></ul><p>它没有简单地把所有历史 frame 全部塞进 context，而是做：</p>$$
+\boxed{
+\text{Retrieve}
+\rightarrow
+\text{Fuse}
+\rightarrow
+\text{Consolidate}
+}
+$$<p>也就是：</p><ol><li>当前状态去历史 memory 中检索相关内容；</li><li>当前信息和历史信息做 gated fusion；</li><li>相似、冗余的 memory 进行压缩。</li></ol><p>因此内部状态可以粗略写成：</p>$$
+b_t=f(o_t,M_{t-1})
+$$<p>然后：</p>$$
+a_t\sim\pi(a_t|b_t,l)
+$$<p>这里最重要的不是某个具体 attention 结构，而是一个认识：</p>$$
+\boxed{
+\text{Memory 不是单纯把 Context Window 拉长}
+}
+$$<p>真正的问题是：</p>$$
+\boxed{
+\text{存什么、什么时候取、怎么融合、怎么压缩}
+}
+$$<h3 id=42-helmmemory-也可以是显式-episodic-memory>4.2 HELM：Memory 也可以是显式 Episodic Memory<a hidden class=anchor aria-hidden=true href=#42-helmmemory-也可以是显式-episodic-memory>#</a></h3><p><a href=https://arxiv.org/abs/2604.18791>HELM</a> 的做法和 MemoryVLA 不一样。</p><p>它更接近显式 episodic memory：</p>$$
+\mathcal M=\{(k_i,v_i)\}
+$$<p>memory 中记录：</p><ul><li>关键 observation；</li><li>当时执行的 subgoal；</li><li>success / failure；</li><li>时间；</li><li>compact state delta。</li></ul><p>而且不是每一帧都存，而是优先记录：</p>$$
+\boxed{
+\text{subgoal success}
+,\quad
+\text{failure}
+,\quad
+\text{checkpoint}
+}
+$$<p>这说明 Memory 也可以从：</p>$$
+\text{latent feature memory}
+$$<p>走向：</p>$$
+\boxed{
+\text{event-oriented episodic memory}
+}
+$$<p>这两个方向现在都还存在，没有统一。</p><hr><h2 id=5-memory-还不够还需要知道当前做到哪里>5. Memory 还不够：还需要知道当前做到哪里<a hidden class=anchor aria-hidden=true href=#5-memory-还不够还需要知道当前做到哪里>#</a></h2><p>即使模型记住了过去，仍然存在一个问题：</p>$$
+\boxed{
+\text{“我记得发生过什么”}
+\neq
+\text{“我知道当前做到哪里”}
+}
+$$<p>例如：</p><blockquote><p>把杯子放进抽屉。</p></blockquote><p>执行过程中可能经历：</p>$$
+\text{还没抓}
+\rightarrow
+\text{已经抓住}
+\rightarrow
+\text{移动中}
+\rightarrow
+\text{已经放进去}
+\rightarrow
+\text{可以松手}
+$$<p>当前 task phase 本身就是一个重要状态变量。</p><hr><h2 id=6-progress显式表示当前执行进程>6. Progress：显式表示当前执行进程<a hidden class=anchor aria-hidden=true href=#6-progress显式表示当前执行进程>#</a></h2><h3 id=61-palm连续的-progress-state>6.1 PALM：连续的 progress state<a hidden class=anchor aria-hidden=true href=#61-palm连续的-progress-state>#</a></h3><p><a href=https://arxiv.org/abs/2601.07060>PALM</a> 显式加入：</p>$$
+p_t\in[0,1]
+$$<p>表示当前 subtask 的进度。</p><p>于是 task state 不再只是：</p>$$
+(o_t,M_t)
+$$<p>而开始包含：</p>$$
+\boxed{
+(o_t,M_t,p_t)
+}
+$$<p>PALM 同时还预测：</p><ul><li>当前应该关注什么 object；</li><li>什么区域适合 contact；</li><li>什么区域适合 placement；</li><li>接下来应该发生什么 motion。</li></ul><p>也就是：</p>$$
+\boxed{
+\text{Affordance State}
++
+\text{Progress State}
+}
+$$<p>这里一个重要变化是：</p><blockquote><p>Progress 不只是为了让模型“知道时间过去了多久”，而是让它区分当前处于任务的哪个 phase。</p></blockquote><p>例如两个 observation 很像：</p>$$
+o_i\approx o_j
+$$<p>但：</p>$$
+p_i=0.2,\qquad p_j=0.9
+$$<p>对应的动作可能完全不同。</p><h3 id=62-progress-还可以用于-termination>6.2 Progress 还可以用于 Termination<a hidden class=anchor aria-hidden=true href=#62-progress-还可以用于-termination>#</a></h3><p>PALM 进一步把 progress 用于：</p>$$
+\boxed{
+\text{什么时候结束当前 skill}
+}
+$$<p>例如：</p>$$
+p_t>\phi
+$$<p>就触发 subtask transition。</p><p>这说明一个变量可以跨模块发挥作用：</p><ul><li>在 Task State 里，$p_t$ 表示进度；</li><li>在 Orchestrator 里，$p_t$ 又可以决定何时切换。</li></ul><p>这也说明：<strong>论文和模块不是一一对应关系。</strong></p><hr><h2 id=7-从-latent-state-到-structured-task-state>7. 从 Latent State 到 Structured Task State<a hidden class=anchor aria-hidden=true href=#7-从-latent-state-到-structured-task-state>#</a></h2><p>MemoryVLA 和 PALM 更偏隐式 latent representation。</p><p>但进入更复杂的 Planner 后，很多工作开始显式维护 task state。</p><h3 id=71-goal2skillprecondition--postcondition>7.1 Goal2Skill：Precondition / Postcondition<a hidden class=anchor aria-hidden=true href=#71-goal2skillprecondition--postcondition>#</a></h3><p><a href=https://arxiv.org/abs/2604.13942>Goal2Skill</a> 不再把一个 subtask 只表示成：</p>$$
+z_k=\text{“pick up cup”}
+$$<p>而是包含：</p>$$
+\tau_k=
+(
+\ell_k,
+\operatorname{pre}_k,
+\operatorname{post}_k,
+...)
+$$<p>这意味着一个 subtask 同时定义：</p>$$
+\boxed{
+\text{什么时候可以执行}
++
+\text{什么叫执行成功}
+}
+$$<p>于是执行后可以比较：</p>$$
+\boxed{
+\text{Expected State}
+\overset{?}{=}
+\text{Observed State}
+}
+$$<p>Task State 开始变得：</p>$$
+\boxed{
+\text{structured}
++
+\text{verifiable}
+}
+$$<p>而不是只有一个神经网络 latent。</p><h3 id=72-loho-manipdone--remaining>7.2 LoHo-Manip：Done + Remaining<a hidden class=anchor aria-hidden=true href=#72-loho-manipdone--remaining>#</a></h3><p><a href=https://arxiv.org/abs/2604.21924>LoHo-Manip</a> 又给出一个更简单的 task-state 表示：</p>$$
+\boxed{
+b_t=[\text{Done},\text{Remaining},\text{Current Visual Trace}]}
+$$<p>它不追求显式维护完整 symbolic world state。</p><p>而是只保留：</p><blockquote><p>哪些已经完成、哪些还剩。</p></blockquote><p>这是一种非常 task-oriented 的 state abstraction。</p><h3 id=73--vlamemory-本身也可能错>7.3 $\tau_0$-VLA：Memory 本身也可能错<a hidden class=anchor aria-hidden=true href=#73--vlamemory-本身也可能错>#</a></h3><p>更进一步，<a href=https://arxiv.org/abs/2608.16885>$\tau_0$-VLA</a> 开始考虑：</p>$$
+\boxed{
+\text{Memory / Task State 本身可能不正确}
+}
+$$<p>例如：</p><ul><li>memory 落后于真实状态；</li><li>memory 比真实状态提前；</li><li>memory 和当前 observation 发生冲突。</li></ul><p>这时候需要：</p>$$
+(o_t,M_{t-1})
+\rightarrow
+M_t^{corrected}
+$$<p>也就是：</p>$$
+\boxed{
+\text{Task-State Revision}
+}
+$$<p>这已经比“把历史留下来”更接近一个真正的 belief update 问题。</p><hr><h2 id=8-task-state-这一条线可以怎么理解>8. Task State 这一条线可以怎么理解？<a hidden class=anchor aria-hidden=true href=#8-task-state-这一条线可以怎么理解>#</a></h2><p>从目前这些工作看，可以粗略写成：</p>$$
+\boxed{o_t}
+$$<p>↓</p>$$
+\boxed{(o_t,M_t)}
+$$<p>Memory</p><p>↓</p>$$
+\boxed{(o_t,M_t,p_t)}
+$$<p>Progress</p><p>↓</p>$$
+\boxed{
+b_t=[\text{history},\text{progress},\text{done},\text{remaining},\text{failure},...]}
+$$<p>Structured Task State</p><p>↓</p>$$
+\boxed{
+b_t\xrightarrow{\text{new evidence}}b_{t+1}}
+$$<p>State Revision</p><p>真正稳定的问题不是“到底应该用 Memory Bank 还是自然语言 summary”。</p><p>而是：</p>$$
+\boxed{
+\text{一个长期 agent 到底需要维护什么 Task State？
+这个状态怎么根据新 observation 持续修正？}
+}
+$$<hr><h2 id=part-iiplanner>Part II：Planner<a hidden class=anchor aria-hidden=true href=#part-iiplanner>#</a></h2><h2 id=9-有了-task-state下一步才是-planning>9. 有了 Task State，下一步才是 Planning<a hidden class=anchor aria-hidden=true href=#9-有了-task-state下一步才是-planning>#</a></h2><p>假设已经有：</p>$$
+b_t
+$$<p>以及最终目标：</p>$$
+g
+$$<p>Planner 要解决：</p>$$
+\boxed{
+P(b_t,g)\rightarrow z_t
+}
+$$<p>其中：</p>$$
+z_t
+$$<p>是下一个 semantic subgoal / skill。</p><p>这部分可以从简单到复杂分成几个层次。</p><hr><h2 id=10-第一层goal-decomposition>10. 第一层：Goal Decomposition<a hidden class=anchor aria-hidden=true href=#10-第一层goal-decomposition>#</a></h2><p>最简单的 Planner：</p>$$
+g\rightarrow[z_1,z_2,\ldots,z_K]
+$$<p>例如：</p><blockquote><p>整理桌子。</p></blockquote><p>拆成：</p>$$
+\text{pick cup}
+\rightarrow
+\text{place cup}
+\rightarrow
+\text{pick plate}
+\rightarrow
+\text{place plate}
+$$<p>这已经能显著降低低层 VLA 的有效 horizon。</p><p>VLA 不再需要直接解决：</p>$$
+\text{十分钟任务}
+$$<p>而只需要不断解决：</p>$$
+\boxed{
+\text{几秒钟级别的局部 skill}
+}
+$$<p>这也是 Hierarchical VLA 的基本逻辑。</p><hr><h2 id=11-第二层closed-loop-replanning>11. 第二层：Closed-Loop Replanning<a hidden class=anchor aria-hidden=true href=#11-第二层closed-loop-replanning>#</a></h2><p>一次生成完整计划并执行到底并不可靠。</p><p>因为执行结果会改变环境：</p>$$
+b_t\xrightarrow{z_t}b_{t+1}
+$$<p>而真实：</p>$$
+b_{t+1}
+$$<p>可能和计划中的预期不同。</p><h3 id=111-goal2skill反馈真正修改-future-plan>11.1 Goal2Skill：反馈真正修改 Future Plan<a hidden class=anchor aria-hidden=true href=#111-goal2skill反馈真正修改-future-plan>#</a></h3><p>Goal2Skill 的闭环是：</p>$$
+\text{Plan}
+\rightarrow
+\text{Execute}
+\rightarrow
+\text{Observe}
+\rightarrow
+\text{Verify}
+\rightarrow
+\text{Update State}
+\rightarrow
+\text{Revise Plan}
+$$<p>如果当前 subtask 失败，reflection 可以得到：</p>$$
+\boxed{
+\text{retry}
+\quad/\quad
+\text{adjust}
+\quad/\quad
+\text{replan}
+}
+$$<p>这里第一次比较明确地出现：</p>$$
+\boxed{
+\text{feedback 不只是触发 retry，
+而是可以修改后续计划本身}
+}
+$$<hr><h2 id=12-第三层receding-horizon-task-planning>12. 第三层：Receding-Horizon Task Planning<a hidden class=anchor aria-hidden=true href=#12-第三层receding-horizon-task-planning>#</a></h2><h3 id=121-loho-manipdone--remaining>12.1 LoHo-Manip：Done + Remaining<a hidden class=anchor aria-hidden=true href=#121-loho-manipdone--remaining>#</a></h3><p>Goal2Skill 更像：</p>$$
+\text{维护一份计划，然后修它}
+$$<p>LoHo-Manip 则换了一种思路：</p><blockquote><p>每次看到新的 observation，重新判断“已经做完什么、剩下什么”。</p></blockquote><p>即：</p>$$
+(o_t,g)
+\rightarrow
+[
+\text{Done},
+\text{Remaining}
+]
+$$<p>执行一点以后：</p>$$
+o_{t+1}
+$$<p>再次：</p>$$
+(o_{t+1},g)
+\rightarrow
+[
+\text{Done}',
+\text{Remaining}'
+]
+$$<p>从控制思想上看，这和 MPC 很相似：</p>$$
+\boxed{
+\text{Plan}
+\rightarrow
+\text{Execute Locally}
+\rightarrow
+\text{Observe}
+\rightarrow
+\text{Replan}
+}
+$$<p>区别是这里的 planning variable 不再是低层连续 action：</p>$$
+a_t,a_{t+1},\ldots
+$$<p>而是：</p>$$
+\boxed{
+\text{semantic task sequence}
+}
+$$<p>因此可以把它理解成：</p>$$
+\boxed{
+\text{Task-Level Receding Horizon}
+}
+$$<hr><h2 id=13-第四层counterfactual-planning>13. 第四层：Counterfactual Planning<a hidden class=anchor aria-hidden=true href=#13-第四层counterfactual-planning>#</a></h2><p>前面的 Planner 虽然会不断 replanning，但大多数情况下仍然是：</p>$$
+(b_t,g)
+\xrightarrow{\text{one forward}}
+z_t
+$$<p>也就是：</p><blockquote><p>看见当前状态，直接猜下一步。</p></blockquote><p>但这和经典 planning 仍然有差别。</p><p>真正的 look-ahead 应该是：</p>$$
+z_A\rightarrow\hat b_A
+$$$$
+z_B\rightarrow\hat b_B
+$$<p>然后比较：</p>$$
+V(\hat b_A),V(\hat b_B)
+$$<p>再决定。</p><hr><h2 id=14--vlaworld-model-被重新拿回-planner>14. $\tau_0$-VLA：World Model 被重新拿回 Planner<a hidden class=anchor aria-hidden=true href=#14--vlaworld-model-被重新拿回-planner>#</a></h2><p>$\tau_0$-VLA 把高层 decision 显式写成 search。</p><p>先生成候选：</p>$$
+z_1,\ldots,z_N
+$$<p>World Model：</p>$$
+(o_t,z_i)
+\rightarrow
+\hat o_i
+$$<p>预测：</p><blockquote><p>如果执行这个 semantic subgoal，完成以后世界大概是什么样。</p></blockquote><p>然后 Value Model：</p>$$
+V(g,z_i,\hat o_i)
+$$<p>评价：</p><blockquote><p>这个未来对最终任务好不好。</p></blockquote><p>于是出现：</p>$$
+\boxed{
+\text{Propose}
+\rightarrow
+\text{Imagine}
+\rightarrow
+\text{Evaluate}
+\rightarrow
+\text{Choose}
+}
+$$<p>再配合 beam search：</p>$$
+z_1
+\rightarrow
+\hat o_1
+\rightarrow
+z_2
+\rightarrow
+\hat o_2
+\rightarrow
+\cdots
+$$<p>这才真正回到我们之前学过的：</p>$$
+\boxed{
+\text{Prediction}
++
+\text{Evaluation}
++
+\text{Search}
+}
+$$<p>只不过 planning variable 从低层 action 变成了：</p>$$
+\boxed{
+\text{semantic subgoal}
+}
+$$<hr><h2 id=15-world-model-在这里应该怎么定位>15. World Model 在这里应该怎么定位？<a hidden class=anchor aria-hidden=true href=#15-world-model-在这里应该怎么定位>#</a></h2><p>World Model 不一定要作为第五个和 Planner 平级的模块。</p><p>在目前这类 Long-Horizon 工作里，更自然的理解是：</p>$$
+\boxed{
+\text{World Model 是 Planner 内部的 Look-Ahead Mechanism}
+}
+$$<p>普通 Planner：</p>$$
+b_t\rightarrow z_t
+$$<p>加入 World Model：</p>$$
+b_t
+\rightarrow
+\{z_i\}
+\rightarrow
+\{\hat b_i\}
+\rightarrow
+\{V_i\}
+\rightarrow
+z^*
+$$<p>也就是：</p>$$
+\boxed{
+\text{Proposal}
++
+\text{World Model}
++
+\text{Value}
++
+\text{Search}
+}
+$$<p>这也把 World Model 和 VLA 两条路线真正重新接上了。</p><hr><h2 id=part-iiiexecutor>Part III：Executor<a hidden class=anchor aria-hidden=true href=#part-iiiexecutor>#</a></h2><h2 id=16-executor-在-long-horizon-中的位置反而更明确了>16. Executor 在 Long-Horizon 中的位置反而更明确了<a hidden class=anchor aria-hidden=true href=#16-executor-在-long-horizon-中的位置反而更明确了>#</a></h2><p>Planner 决定：</p>$$
+z_t=\text{“pick up the cup”}
+$$<p>Executor 负责：</p>$$
+(o_t,z_t)\rightarrow A_t
+$$<p>其中：</p>$$
+A_t=[a_t,\ldots,a_{t+H-1}]
+$$<p>这一部分就是<a href=https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/>前面 VLA 笔记已经展开过的</a>：</p><ul><li><a href=https://publications.ri.cmu.edu/alvinn-an-autonomous-land-vehicle-in-a-neural-network>Behavior Cloning</a>；</li><li><a href=https://arxiv.org/abs/2304.13705>Action Chunking</a>；</li><li>Diffusion Policy；</li><li>Flow Matching；</li><li>VLA Action Expert。</li></ul><p>所以在这篇笔记里不需要重新详细展开。</p><p>Long-Horizon 只是把 VLA 的位置变得更清楚：</p>$$
+\boxed{
+\text{VLA = Local Skill Executor}
+}
+$$<hr><h2 id=17-planner--executor-的-interface-本身也是一个问题>17. Planner → Executor 的 Interface 本身也是一个问题<a hidden class=anchor aria-hidden=true href=#17-planner--executor-的-interface-本身也是一个问题>#</a></h2><p>虽然 Executor 不需要重讲，但 Planner 如何向 Executor 表达 intention 很重要。</p><h3 id=171-language-subgoal>17.1 Language Subgoal<a hidden class=anchor aria-hidden=true href=#171-language-subgoal>#</a></h3><p>最常见：</p>$$
+z_t=\text{“pick up the cup”}
+$$<p>优点是语义清楚。</p><p>缺点是 spatial grounding 可能不够。</p><h3 id=172-visual-trace>17.2 Visual Trace<a hidden class=anchor aria-hidden=true href=#172-visual-trace>#</a></h3><p>LoHo-Manip 加入：</p>$$
+\gamma_t=[(x_1,y_1),\ldots,(x_k,y_k)]
+$$<p>告诉 Executor：</p><blockquote><p>大概沿图像哪个方向运动。</p></blockquote><p>于是 interface 变成：</p>$$
+\boxed{
+\text{Language}
++
+\text{Visual Trace}
+}
+$$<p>也就是：</p><blockquote><p>做什么 + 大概往哪里做。</p></blockquote><h3 id=173-visual-subgoal>17.3 Visual Subgoal<a hidden class=anchor aria-hidden=true href=#173-visual-subgoal>#</a></h3><p><a href=https://arxiv.org/abs/2604.15483>$\pi_{0.7}$</a> 等工作进一步使用：</p>$$
+\hat o_{\text{subgoal}}
+$$<p>表示：</p><blockquote><p>当前 subtask 完成以后，世界应该长什么样。</p></blockquote><p>于是 Executor 可以解决：</p>$$
+(o_{\text{current}},o_{\text{subgoal}})
+\rightarrow
+A
+$$<p>这有一点 inverse dynamics 的味道。</p><p>所以 Planner → Executor interface 目前也没有统一：</p>$$
+\boxed{
+\text{Language}
+\quad vs\quad
+\text{Visual Trace}
+\quad vs\quad
+\text{Visual Subgoal}
+}
+$$<hr><h2 id=part-ivorchestration--harness>Part IV：Orchestration / Harness<a hidden class=anchor aria-hidden=true href=#part-ivorchestration--harness>#</a></h2><h2 id=18-为什么单纯-planner--vla-还不够>18. 为什么单纯 Planner + VLA 还不够？<a hidden class=anchor aria-hidden=true href=#18-为什么单纯-planner--vla-还不够>#</a></h2><p>一个 naive hierarchy：</p>$$
+\text{Planner}
+\rightarrow
+z_t
+\rightarrow
+\text{VLA}
+$$<p>仍然有一堆 execution-level 问题：</p><ul><li>当前 skill 应该执行多久？</li><li>什么时候把控制权还给 Planner？</li><li>当前动作真的合理吗？</li><li>当前 subgoal 真的完成了吗？</li><li>失败以后是 retry 还是 replan？</li></ul><p>这些问题本身不完全属于 Planning。</p><p>它们更像：</p>$$
+\boxed{
+\text{Orchestration / Harness}
+}
+$$<hr><h2 id=19-termination什么时候结束当前-skill>19. Termination：什么时候结束当前 Skill？<a hidden class=anchor aria-hidden=true href=#19-termination什么时候结束当前-skill>#</a></h2><p>如果 Planner 给：</p>$$
+z_t=\text{pick cup}
+$$<p>VLA 到底执行多久？</p><p>可能有几种方案。</p><h3 id=fixed-duration>Fixed Duration<a hidden class=anchor aria-hidden=true href=#fixed-duration>#</a></h3>$$
+T=8s
+$$<p>时间到了就切换。</p><h3 id=predicted-duration>Predicted Duration<a hidden class=anchor aria-hidden=true href=#predicted-duration>#</a></h3><p>Planner 事先预测：</p><blockquote><p>这个 skill 大概执行 6 秒。</p></blockquote><h3 id=success-based-termination>Success-Based Termination<a hidden class=anchor aria-hidden=true href=#success-based-termination>#</a></h3><p>真正检测：</p>$$
+\boxed{
+\text{subgoal 是否完成}
+}
+$$<p><a href=https://arxiv.org/abs/2606.10267>Hi-VLA systematic study</a> 在长时程与推理任务上的评估支持：</p>$$
+\boxed{
+\text{success-based switching}
+}
+$$<p>比纯 time-driven 更可靠；这组实验中的成功检测使用了仿真器特权状态。</p><p>PALM 则用：</p>$$
+p_t>\phi
+$$<p>把 progress 和 termination 连起来。</p><hr><h2 id=20-verification模型提出的动作到底该不该执行>20. Verification：模型提出的动作到底该不该执行？<a hidden class=anchor aria-hidden=true href=#20-verification模型提出的动作到底该不该执行>#</a></h2><p>普通 VLA：</p>$$
+o_t\rightarrow a_t\rightarrow\text{execute}
+$$<p>HELM 在中间加入：</p>$$
+\boxed{
+P(\text{failure}|o_t,a_t,g_t,M_t)
+}
+$$<p>也就是说：</p><blockquote><p>当前这个 proposed action，在当前任务上下文里会不会出错？</p></blockquote><p>这里很重要的一点是：</p>$$
+\boxed{
+\text{Action 是否正确，取决于 Task History}
+}
+$$<p>例如：</p><blockquote><p>put mug in cabinet</p></blockquote><p>如果 mug 已经放进去过，这个动作即使几何上可行，在 task-level 也是错误的。</p><p>所以 Verifier 实际是在利用：</p>$$
+\text{Current State}
++
+\text{Memory}
++
+\text{Task}
+$$<p>判断：</p>$$
+\text{Action Validity}
+$$<hr><h2 id=21-recovery发现错了以后怎么办>21. Recovery：发现错了以后怎么办？<a hidden class=anchor aria-hidden=true href=#21-recovery发现错了以后怎么办>#</a></h2><p>知道：</p>$$
+\text{failure=True}
+$$<p>还不够。</p><p>系统还要选择：</p>$$
+\boxed{
+\text{retry}
+,\quad
+\text{rollback}
+,\quad
+\text{forward recovery}
+,\quad
+\text{return to planner}
+}
+$$<h3 id=211-retry>21.1 Retry<a hidden class=anchor aria-hidden=true href=#211-retry>#</a></h3><p>偶然 grasp 失败：</p>$$
+\text{retry same skill}
+$$<h3 id=212-rollback>21.2 Rollback<a hidden class=anchor aria-hidden=true href=#212-rollback>#</a></h3><p>HELM 的仿真实验中可以回到最近成功 checkpoint：</p>$$
+s'_t\rightarrow s_{\text{checkpoint}}
+$$<p>然后重新执行当前 subgoal。</p><h3 id=213-forward-recovery>21.3 Forward Recovery<a hidden class=anchor aria-hidden=true href=#213-forward-recovery>#</a></h3><p>物理环境很多时候无法真的 rollback。</p><p>例如杯子已经掉到了新的位置。</p><p>这时：</p>$$
+s'_t
+\rightarrow
+\text{new recovery behavior}
+$$<p>也就是从当前 corrupted state 往前恢复。HELM-Fwd 是 HELM 针对无法回滚的情形设计的前向恢复变体。</p><h3 id=214-return-to-planner>21.4 Return to Planner<a hidden class=anchor aria-hidden=true href=#214-return-to-planner>#</a></h3><p>如果局部 recovery 已经解决不了：</p>$$
+\boxed{
+\text{Harness}
+\rightarrow
+\text{Planner}
+}
+$$<p>让高层重新规划未来任务。</p><p>所以 Orchestrator 最核心的问题其实是：</p>$$
+\boxed{
+\text{什么时候局部处理，
+什么时候必须重新高层决策？}
+}
+$$<hr><h2 id=22-四个模块之间真正困难的是-interface>22. 四个模块之间真正困难的是 Interface<a hidden class=anchor aria-hidden=true href=#22-四个模块之间真正困难的是-interface>#</a></h2><p>这些论文之所以高度耦合，根本原因是：</p>$$
+\boxed{
+\text{Long-Horizon 的难点不只在模块本身，
+更在模块之间的信息接口。}
+}
+$$<h3 id=task-state--planner>Task State → Planner<a hidden class=anchor aria-hidden=true href=#task-state--planner>#</a></h3>$$
+b_t\rightarrow z_t
+$$<p>问题：</p><blockquote><p>什么样的 task state 才足够支持高层决策？</p></blockquote><p>MemoryVLA、PALM、Goal2Skill、LoHo-Manip、$\tau_0$ 都给了不同答案。</p><h3 id=planner--executor>Planner → Executor<a hidden class=anchor aria-hidden=true href=#planner--executor>#</a></h3>$$
+z_t\rightarrow A_t
+$$<p>问题：</p><blockquote><p>高层 intention 应该用什么 representation 传给低层？</p></blockquote><p>可能是：</p>$$
+\text{language}
+$$<p>也可能是：</p>$$
+\text{visual trace}
+$$<p>或者：</p>$$
+\text{visual subgoal}
+$$<h3 id=executor--task-state>Executor → Task State<a hidden class=anchor aria-hidden=true href=#executor--task-state>#</a></h3><p>执行以后：</p>$$
+A_t\rightarrow o_{t+1}
+$$<p>然后需要得到：</p>$$
+\boxed{
+\text{success / progress / failure / new task state}
+}
+$$<p>PALM、HELM、Goal2Skill 都在研究这个接口。</p><h3 id=task-state--world-model--planner>Task State → World Model → Planner<a hidden class=anchor aria-hidden=true href=#task-state--world-model--planner>#</a></h3><p>如果 Planner 需要 look-ahead：</p>$$
+(b_t,z_i)
+\rightarrow
+\hat b_{t+1}^{(i)}
+$$<p>然后：</p>$$
+V(\hat b_{t+1}^{(i)})
+$$<p>这是 $\tau_0$-VLA 等工作开始研究的接口。</p><hr><h2 id=23-两种闭环>23. 两种闭环<a hidden class=anchor aria-hidden=true href=#23-两种闭环>#</a></h2><p>到目前为止，Long-Horizon 系统里其实出现了两类不同的闭环。</p><h3 id=231-reality-loop>23.1 Reality Loop<a hidden class=anchor aria-hidden=true href=#231-reality-loop>#</a></h3><p>机器人真的执行：</p>$$
+\boxed{
+\text{Plan}
+\rightarrow
+\text{Act}
+\rightarrow
+\text{Observe}
+\rightarrow
+\text{Update State}
+\rightarrow
+\text{Recover / Replan}
+}
+$$<p>MemoryVLA、PALM、HELM、Goal2Skill、LoHo-Manip 主要都在不同程度上补这个 loop。</p><p>它的特点是：</p>$$
+\boxed{
+\text{先进入真实世界，再根据真实反馈修正}
+}
+$$<h3 id=232-imagination-loop>23.2 Imagination Loop<a hidden class=anchor aria-hidden=true href=#232-imagination-loop>#</a></h3><p>World Model 加入以后：</p>$$
+\boxed{
+\text{Propose}
+\rightarrow
+\text{Imagine}
+\rightarrow
+\text{Evaluate}
+\rightarrow
+\text{Choose}
+}
+$$<p>这发生在真正执行之前。</p><p>也就是：</p>$$
+\boxed{
+\text{Counterfactual Planning}
+}
+$$<p>这时候 Agent 不只是：</p><blockquote><p>做错以后改。</p></blockquote><p>而开始：</p><blockquote><p>做之前先比较几个未来。</p></blockquote><p>这才比较接近我们传统意义上的 planning。</p><hr><h2 id=24-paper--module-对应关系>24. Paper × Module 对应关系<a hidden class=anchor aria-hidden=true href=#24-paper--module-对应关系>#</a></h2><p>这些论文大多跨多个模块，因此更适合用“主贡献 / 次贡献”的方式理解。</p><table><thead><tr><th>Paper</th><th>Task State</th><th>Planner</th><th>Executor</th><th>Orchestrator / Harness</th></tr></thead><tbody><tr><td><strong><a href=https://arxiv.org/abs/2606.10267>Hi-VLA Systematic Study</a></strong></td><td>次：observation / memory</td><td>次：VLM planner</td><td>次：VLA controller</td><td><strong>主：termination / orchestration</strong></td></tr><tr><td><strong><a href=https://arxiv.org/abs/2508.19236>MemoryVLA</a></strong></td><td><strong>主：perceptual + cognitive memory</strong></td><td></td><td>次：memory-conditioned action</td><td></td></tr><tr><td><strong><a href=https://arxiv.org/abs/2601.07060>PALM</a></strong></td><td><strong>主：progress + affordance</strong></td><td></td><td>次：diffusion action</td><td><strong>次：progress-based termination</strong></td></tr><tr><td><strong><a href=https://arxiv.org/abs/2604.18791>HELM</a></strong></td><td>次：episodic memory</td><td></td><td>次：base VLA</td><td><strong>主：verification + recovery</strong></td></tr><tr><td><strong><a href=https://arxiv.org/abs/2604.13942>Goal2Skill</a></strong></td><td><strong>主：structured memory + pre/post state</strong></td><td><strong>主：reflection / replanning</strong></td><td>次：skill executor</td><td><strong>主：verification / retry / adjust</strong></td></tr><tr><td><strong><a href=https://arxiv.org/abs/2604.21924>LoHo-Manip</a></strong></td><td>次：Done + Remaining</td><td><strong>主：receding-horizon replanning</strong></td><td>次：visual-trace conditioned VLA</td><td>次：implicit recovery</td></tr><tr><td><strong><a href=https://arxiv.org/abs/2608.16885>$\tau_0$-VLA</a></strong></td><td>次：memory correction</td><td><strong>主：world model + value + search</strong></td><td>次：flow-based VLA</td><td>次</td></tr></tbody></table><p>这里最重要的不是表格本身，而是承认：</p>$$
+\boxed{
+\text{Paper}\neq\text{Module}
+}
+$$<p>一篇系统论文完全可能同时研究：</p>$$
+\text{Task State}
++
+\text{Planner}
++
+\text{Verification}
+$$<p>正文应该围绕模块写，论文只是不同模块上的案例。</p><hr><h2 id=25-paper-cards>25. Paper Cards<a hidden class=anchor aria-hidden=true href=#25-paper-cards>#</a></h2><p>下面只保留每篇论文最值得记住的角色，避免正文变成论文流水账。</p><h3 id=hi-vla-systematic-study><a href=https://arxiv.org/abs/2606.10267>Hi-VLA Systematic Study</a><a hidden class=anchor aria-hidden=true href=#hi-vla-systematic-study>#</a></h3><h4 id=核心问题>核心问题<a hidden class=anchor aria-hidden=true href=#核心问题>#</a></h4>$$
+\boxed{
+\text{Planner + VLA 到底应该怎么 orchestration？}
+}
+$$<h4 id=主要涉及>主要涉及<a hidden class=anchor aria-hidden=true href=#主要涉及>#</a></h4><ul><li>Planner capability；</li><li>low-level VLA steerability；</li><li>observation representation；</li><li>memory；</li><li>termination / switching。</li></ul><h4 id=最重要的认识>最重要的认识<a hidden class=anchor aria-hidden=true href=#最重要的认识>#</a></h4>$$
+\boxed{
+\text{仅仅加一个 VLM Planner 不够，
+Planner 和 Executor 之间怎么闭环本身非常重要。}
+}
+$$<hr><h3 id=memoryvla><a href=https://arxiv.org/abs/2508.19236>MemoryVLA</a><a hidden class=anchor aria-hidden=true href=#memoryvla>#</a></h3><h4 id=核心问题-1>核心问题<a hidden class=anchor aria-hidden=true href=#核心问题-1>#</a></h4>$$
+\boxed{
+\text{当前 observation 不足时，历史怎么进入 policy？}
+}
+$$<h4 id=主要涉及-1>主要涉及<a hidden class=anchor aria-hidden=true href=#主要涉及-1>#</a></h4><ul><li>perceptual memory；</li><li>cognitive memory；</li><li>retrieval；</li><li>gated fusion；</li><li>consolidation。</li></ul><h4 id=最重要的认识-1>最重要的认识<a hidden class=anchor aria-hidden=true href=#最重要的认识-1>#</a></h4>$$
+\boxed{
+\text{Memory 不是简单增加 context length，
+而是构造 task-relevant history representation。}
+}
+$$<hr><h3 id=palm><a href=https://arxiv.org/abs/2601.07060>PALM</a><a hidden class=anchor aria-hidden=true href=#palm>#</a></h3><h4 id=核心问题-2>核心问题<a hidden class=anchor aria-hidden=true href=#核心问题-2>#</a></h4>$$
+\boxed{
+\text{当前 subtask 做到哪里了？}
+}
+$$<h4 id=主要涉及-2>主要涉及<a hidden class=anchor aria-hidden=true href=#主要涉及-2>#</a></h4><ul><li>affordance foresight；</li><li>continuous progress；</li><li>progress-conditioned action；</li><li>progress-based switching。</li></ul><h4 id=最重要的认识-2>最重要的认识<a hidden class=anchor aria-hidden=true href=#最重要的认识-2>#</a></h4>$$
+\boxed{
+\text{Task State 不只需要 history，
+还需要 phase / progress。}
+}
+$$<hr><h3 id=helm><a href=https://arxiv.org/abs/2604.18791>HELM</a><a hidden class=anchor aria-hidden=true href=#helm>#</a></h3><h4 id=核心问题-3>核心问题<a hidden class=anchor aria-hidden=true href=#核心问题-3>#</a></h4>$$
+\boxed{
+\text{VLA 提出的动作可能错，怎么提前发现并恢复？}
+}
+$$<h4 id=主要涉及-3>主要涉及<a hidden class=anchor aria-hidden=true href=#主要涉及-3>#</a></h4><ul><li>episodic memory；</li><li>state/action verifier；</li><li>rollback；</li><li>forward recovery。</li></ul><h4 id=最重要的认识-3>最重要的认识<a hidden class=anchor aria-hidden=true href=#最重要的认识-3>#</a></h4>$$
+\boxed{
+\text{Action 是否合理依赖 task history；
+发现错误以后还必须有 recovery mechanism。}
+}
+$$<hr><h3 id=goal2skill><a href=https://arxiv.org/abs/2604.13942>Goal2Skill</a><a hidden class=anchor aria-hidden=true href=#goal2skill>#</a></h3><h4 id=核心问题-4>核心问题<a hidden class=anchor aria-hidden=true href=#核心问题-4>#</a></h4>$$
+\boxed{
+\text{执行反馈怎么真正修改 future plan？}
+}
+$$<h4 id=主要涉及-4>主要涉及<a hidden class=anchor aria-hidden=true href=#主要涉及-4>#</a></h4><ul><li>structured memory；</li><li>precondition；</li><li>postcondition；</li><li>verification；</li><li>reflection；</li><li>retry / adjust / replan。</li></ul><h4 id=最重要的认识-4>最重要的认识<a hidden class=anchor aria-hidden=true href=#最重要的认识-4>#</a></h4>$$
+\boxed{
+\text{反馈不只是用来 retry，
+而是可以改变整个后续计划。}
+}
+$$<hr><h3 id=loho-manip><a href=https://arxiv.org/abs/2604.21924>LoHo-Manip</a><a hidden class=anchor aria-hidden=true href=#loho-manip>#</a></h3><h4 id=核心问题-5>核心问题<a hidden class=anchor aria-hidden=true href=#核心问题-5>#</a></h4>$$
+\boxed{
+\text{为什么要死守第一次生成的 Todo List？}
+}
+$$<h4 id=主要涉及-5>主要涉及<a hidden class=anchor aria-hidden=true href=#主要涉及-5>#</a></h4><ul><li>Done / Remaining；</li><li>receding-horizon task planning；</li><li>visual trace；</li><li>implicit recovery。</li></ul><h4 id=最重要的认识-5>最重要的认识<a hidden class=anchor aria-hidden=true href=#最重要的认识-5>#</a></h4>$$
+\boxed{
+\text{每次根据最新状态重新预测剩余任务，
+可以把 task planning 做成闭环。}
+}
+$$<hr><h3><a href=https://arxiv.org/abs/2608.16885>$\tau_0$-VLA</a></h3><h4 id=核心问题-6>核心问题<a hidden class=anchor aria-hidden=true href=#核心问题-6>#</a></h4>$$
+\boxed{
+\text{为什么一定要执行以后才知道 subgoal 选错？
+能不能先预测不同未来再选择？}
+}
+$$<h4 id=主要涉及-6>主要涉及<a hidden class=anchor aria-hidden=true href=#主要涉及-6>#</a></h4><ul><li>memory correction；</li><li>candidate subgoal generation；</li><li>world model；</li><li>value model；</li><li>beam search；</li><li>test-time computation。</li></ul><h4 id=最重要的认识-6>最重要的认识<a hidden class=anchor aria-hidden=true href=#最重要的认识-6>#</a></h4>$$
+\boxed{
+\text{Planner 开始从直接猜下一步，
+转向“预测未来 + 评价 + 搜索”。}
+}
+$$<p>这时 World Model 真正重新进入 planning loop。</p><hr><h2 id=26-哪些更像真正的长期问题哪些更像当前-harness>26. 哪些更像真正的长期问题，哪些更像当前 Harness？<a hidden class=anchor aria-hidden=true href=#26-哪些更像真正的长期问题哪些更像当前-harness>#</a></h2><p>当前这些模块里，有一部分问题比较基础：</p>$$
+\boxed{
+\text{Partial Observability / Memory}
+}
+$$$$
+\boxed{
+\text{Task State}
+}
+$$$$
+\boxed{
+\text{Progress}
+}
+$$$$
+\boxed{
+\text{Temporal Abstraction}
+}
+$$$$
+\boxed{
+\text{Uncertainty}
+}
+$$$$
+\boxed{
+\text{Credit / Value}
+}
+$$$$
+\boxed{
+\text{Counterfactual Future}
+}
+$$<p>这些即使 base VLA 继续变强，也不会简单消失。</p><p>它们可能被更大的模型隐式吸收，但问题本身仍然存在。</p><p>另一方面：</p><ul><li>某个特定 failure classifier；</li><li>某套 rollback rule；</li><li>某种 prompt state machine；</li><li>某个 handcrafted success detector；</li></ul><p>更可能是：</p>$$
+\boxed{
+\text{当前 Base VLA 不够可靠时的阶段性 Harness}
+}
+$$<p>因此当前很多系统都有双重性质：</p>$$
+\boxed{
+\text{Harness} =
+\text{真正必要的 Agent Mechanism}
++
+\text{对当前 Base Model 的能力补丁}
+}
+$$<p>现在这两者还没有完全分开。</p><hr><h2 id=27-暂时的理解>27. 暂时的理解<a hidden class=anchor aria-hidden=true href=#27-暂时的理解>#</a></h2><p>如果把这一轮 Long-Horizon 阅读压成一句话：</p><p>普通 VLA 主要解决：</p>$$
+\boxed{
+\text{“当前该怎么动？”}
+}
+$$<p>而 Long-Horizon 系统开始补：</p>$$
+\boxed{
+\text{“我现在到底是什么任务状态？”}
+}
+$$$$
+\boxed{
+\text{“接下来应该做什么？”}
+}
+$$$$
+\boxed{
+\text{“当前执行是不是仍然正确？”}
+}
+$$$$
+\boxed{
+\text{“如果不正确，怎么恢复或者改计划？”}
+}
+$$<p>以及更进一步：</p>$$
+\boxed{
+\text{“在真正行动前，能不能先比较不同未来？”}
+}
+$$<p>所以整个体系逐渐从：</p>$$
+(o_t,l)\rightarrow A_t
+$$<p>扩展成：</p>$$
+\boxed{
+\text{Observation / History}
+\rightarrow
+\text{Task State}
+\rightarrow
+\text{Planner}
+\rightarrow
+\text{VLA Executor}
+\rightarrow
+\text{Verification / Recovery}
+\rightarrow
+\text{New Task State}
+}
+$$<p>如果再加 World Model：</p>$$
+\boxed{
+\text{Task State}
+\rightarrow
+\text{Candidate Futures}
+\rightarrow
+\text{Value / Search}
+\rightarrow
+\text{Decision}
+}
+$$<p>这时候：</p>$$
+\boxed{
+\text{VLA}
++
+\text{Memory}
++
+\text{Planning}
++
+\text{World Model}
+}
+$$<p>才真正开始构成一个完整的 Long-Horizon embodied agent。</p><hr><h2 id=参考论文与入口>参考论文与入口<a hidden class=anchor aria-hidden=true href=#参考论文与入口>#</a></h2><ol><li><p><strong><a href=https://arxiv.org/abs/2606.10267>What Matters in Orchestrating Robot Policies: A Systematic Study of Hierarchical VLA Agents</a></strong></p></li><li><p><strong><a href=https://arxiv.org/abs/2508.19236>MemoryVLA: Perceptual-Cognitive Memory in Vision-Language-Action Models for Robotic Manipulation</a></strong></p></li><li><p><strong><a href=https://arxiv.org/abs/2601.07060>PALM: Progress-Aware Policy Learning via Affordance Reasoning for Long-Horizon Robotic Manipulation</a></strong></p></li><li><p><strong><a href=https://arxiv.org/abs/2604.18791>HELM: Harness-Enhanced Long-horizon Memory for Vision-Language-Action Manipulation</a></strong></p></li><li><p><strong><a href=https://arxiv.org/abs/2604.13942>Goal2Skill: Long-Horizon Manipulation with Adaptive Planning and Reflection</a></strong></p></li><li><p><strong><a href=https://arxiv.org/abs/2604.21924>Long-Horizon Manipulation via Trace-Conditioned VLA Planning</a></strong>（LoHo-Manip）</p></li><li><p><strong><a href=https://arxiv.org/abs/2608.16885>$\tau_0$-VLA: a Hierarchical Robot Foundation Model with World-Model-Guided Test-Time Computation</a></strong></p></li></ol></div><footer class=post-footer><ul class=post-tags></ul><nav class=paginav><a class=next href=https://letsgetai.github.io/posts/vla-action-modeling-generalist-policy/><span class=title>下一页 »</span>
+<span>VLA：动作建模与通用机器人策略</span></a></nav><ul class=share-buttons><li><a target=_blank rel="noopener noreferrer" aria-label="share Long-Horizon VLA：任务状态、规划、执行与编排 on x" href="https://x.com/intent/tweet/?text=Long-Horizon%20VLA%ef%bc%9a%e4%bb%bb%e5%8a%a1%e7%8a%b6%e6%80%81%e3%80%81%e8%a7%84%e5%88%92%e3%80%81%e6%89%a7%e8%a1%8c%e4%b8%8e%e7%bc%96%e6%8e%92&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2flong-horizon-vla-task-state-planning-orchestration%2f&amp;hashtags="><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M512 62.554V449.446C512 483.97 483.97 512 449.446 512H62.554C28.03 512 0 483.97.0 449.446V62.554C0 28.03 28.029.0 62.554.0H449.446C483.971.0 512 28.03 512 62.554zM269.951 190.75 182.567 75.216H56L207.216 272.95 63.9 436.783h61.366L235.9 310.383l96.667 126.4H456L298.367 228.367l134-153.151H371.033zM127.633 110h36.468l219.38 290.065H349.5z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Long-Horizon VLA：任务状态、规划、执行与编排 on linkedin" href="https://www.linkedin.com/shareArticle?mini=true&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2flong-horizon-vla-task-state-planning-orchestration%2f&amp;title=Long-Horizon%20VLA%ef%bc%9a%e4%bb%bb%e5%8a%a1%e7%8a%b6%e6%80%81%e3%80%81%e8%a7%84%e5%88%92%e3%80%81%e6%89%a7%e8%a1%8c%e4%b8%8e%e7%bc%96%e6%8e%92&amp;summary=Long-Horizon%20VLA%ef%bc%9a%e4%bb%bb%e5%8a%a1%e7%8a%b6%e6%80%81%e3%80%81%e8%a7%84%e5%88%92%e3%80%81%e6%89%a7%e8%a1%8c%e4%b8%8e%e7%bc%96%e6%8e%92&amp;source=https%3a%2f%2fletsgetai.github.io%2fposts%2flong-horizon-vla-task-state-planning-orchestration%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zM160.461 423.278V197.561h-75.04v225.717h75.04zm270.539.0V293.839c0-69.333-37.018-101.586-86.381-101.586-39.804.0-57.634 21.891-67.617 37.266v-31.958h-75.021c.995 21.181.0 225.717.0 225.717h75.02V297.222c0-6.748.486-13.492 2.474-18.315 5.414-13.475 17.767-27.434 38.494-27.434 27.135.0 38.007 20.707 38.007 51.037v120.768H431zM123.448 88.722C97.774 88.722 81 105.601 81 127.724c0 21.658 16.264 39.002 41.455 39.002h.484c26.165.0 42.452-17.344 42.452-39.002-.485-22.092-16.241-38.954-41.943-39.002z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Long-Horizon VLA：任务状态、规划、执行与编排 on reddit" href="https://reddit.com/submit?url=https%3a%2f%2fletsgetai.github.io%2fposts%2flong-horizon-vla-task-state-planning-orchestration%2f&title=Long-Horizon%20VLA%ef%bc%9a%e4%bb%bb%e5%8a%a1%e7%8a%b6%e6%80%81%e3%80%81%e8%a7%84%e5%88%92%e3%80%81%e6%89%a7%e8%a1%8c%e4%b8%8e%e7%bc%96%e6%8e%92"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zM446 265.638c0-22.964-18.616-41.58-41.58-41.58-11.211.0-21.361 4.457-28.841 11.666-28.424-20.508-67.586-33.757-111.204-35.278l18.941-89.121 61.884 13.157c.756 15.734 13.642 28.29 29.56 28.29 16.407.0 29.706-13.299 29.706-29.701.0-16.403-13.299-29.702-29.706-29.702-11.666.0-21.657 6.792-26.515 16.578l-69.105-14.69c-1.922-.418-3.939-.042-5.585 1.036-1.658 1.073-2.811 2.761-3.224 4.686l-21.152 99.438c-44.258 1.228-84.046 14.494-112.837 35.232-7.468-7.164-17.589-11.591-28.757-11.591-22.965.0-41.585 18.616-41.585 41.58.0 16.896 10.095 31.41 24.568 37.918-.639 4.135-.99 8.328-.99 12.576.0 63.977 74.469 115.836 166.33 115.836s166.334-51.859 166.334-115.836c0-4.218-.347-8.387-.977-12.493 14.564-6.47 24.735-21.034 24.735-38.001zM326.526 373.831c-20.27 20.241-59.115 21.816-70.534 21.816-11.428.0-50.277-1.575-70.522-21.82-3.007-3.008-3.007-7.882.0-10.889 3.003-2.999 7.882-3.003 10.885.0 12.777 12.781 40.11 17.317 59.637 17.317 19.522.0 46.86-4.536 59.657-17.321 3.016-2.999 7.886-2.995 10.885.008 3.008 3.011 3.003 7.882-.008 10.889zm-5.23-48.781c-16.373.0-29.701-13.324-29.701-29.698.0-16.381 13.328-29.714 29.701-29.714 16.378.0 29.706 13.333 29.706 29.714.0 16.374-13.328 29.698-29.706 29.698zM160.91 295.348c0-16.381 13.328-29.71 29.714-29.71 16.369.0 29.689 13.329 29.689 29.71.0 16.373-13.32 29.693-29.689 29.693-16.386.0-29.714-13.32-29.714-29.693z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Long-Horizon VLA：任务状态、规划、执行与编排 on facebook" href="https://facebook.com/sharer/sharer.php?u=https%3a%2f%2fletsgetai.github.io%2fposts%2flong-horizon-vla-task-state-planning-orchestration%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H342.978V319.085h66.6l12.672-82.621h-79.272v-53.617c0-22.603 11.073-44.636 46.58-44.636H425.6v-70.34s-32.71-5.582-63.982-5.582c-65.288.0-107.96 39.569-107.96 111.204v62.971h-72.573v82.621h72.573V512h-191.104c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Long-Horizon VLA：任务状态、规划、执行与编排 on whatsapp" href="https://api.whatsapp.com/send?text=Long-Horizon%20VLA%ef%bc%9a%e4%bb%bb%e5%8a%a1%e7%8a%b6%e6%80%81%e3%80%81%e8%a7%84%e5%88%92%e3%80%81%e6%89%a7%e8%a1%8c%e4%b8%8e%e7%bc%96%e6%8e%92%20-%20https%3a%2f%2fletsgetai.github.io%2fposts%2flong-horizon-vla-task-state-planning-orchestration%2f"><svg viewBox="0 0 512 512" height="30" width="30" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554v386.892C512 483.97 483.97 512 449.446 512H62.554c-34.524.0-62.554-28.03-62.554-62.554V62.554c0-34.524 28.029-62.554 62.554-62.554h386.892zm-58.673 127.703c-33.842-33.881-78.847-52.548-126.798-52.568-98.799.0-179.21 80.405-179.249 179.234-.013 31.593 8.241 62.428 23.927 89.612l-25.429 92.884 95.021-24.925c26.181 14.28 55.659 21.807 85.658 21.816h.074c98.789.0 179.206-80.413 179.247-179.243.018-47.895-18.61-92.93-52.451-126.81zM263.976 403.485h-.06c-26.734-.01-52.954-7.193-75.828-20.767l-5.441-3.229-56.386 14.792 15.05-54.977-3.542-5.637c-14.913-23.72-22.791-51.136-22.779-79.287.033-82.142 66.867-148.971 149.046-148.971 39.793.014 77.199 15.531 105.329 43.692 28.128 28.16 43.609 65.592 43.594 105.4-.034 82.149-66.866 148.983-148.983 148.984zm81.721-111.581c-4.479-2.242-26.499-13.075-30.604-14.571-4.105-1.495-7.091-2.241-10.077 2.241-2.986 4.483-11.569 14.572-14.182 17.562-2.612 2.988-5.225 3.364-9.703 1.12-4.479-2.241-18.91-6.97-36.017-22.23C231.8 264.15 222.81 249.484 220.198 245s-.279-6.908 1.963-9.14c2.016-2.007 4.48-5.232 6.719-7.847 2.24-2.615 2.986-4.484 4.479-7.472 1.493-2.99.747-5.604-.374-7.846-1.119-2.241-10.077-24.288-13.809-33.256-3.635-8.733-7.327-7.55-10.077-7.688-2.609-.13-5.598-.158-8.583-.158-2.986.0-7.839 1.121-11.944 5.604-4.105 4.484-15.675 15.32-15.675 37.364.0 22.046 16.048 43.342 18.287 46.332 2.24 2.99 31.582 48.227 76.511 67.627 10.685 4.615 19.028 7.371 25.533 9.434 10.728 3.41 20.492 2.929 28.209 1.775 8.605-1.285 26.499-10.833 30.231-21.295 3.732-10.464 3.732-19.431 2.612-21.298-1.119-1.869-4.105-2.99-8.583-5.232z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Long-Horizon VLA：任务状态、规划、执行与编排 on telegram" href="https://telegram.me/share/url?text=Long-Horizon%20VLA%ef%bc%9a%e4%bb%bb%e5%8a%a1%e7%8a%b6%e6%80%81%e3%80%81%e8%a7%84%e5%88%92%e3%80%81%e6%89%a7%e8%a1%8c%e4%b8%8e%e7%bc%96%e6%8e%92&amp;url=https%3a%2f%2fletsgetai.github.io%2fposts%2flong-horizon-vla-task-state-planning-orchestration%2f"><svg viewBox="2 2 28 28" height="30" width="30" fill="currentColor"><path d="M26.49 29.86H5.5a3.37 3.37.0 01-2.47-1 3.35 3.35.0 01-1-2.47V5.48A3.36 3.36.0 013 3 3.37 3.37.0 015.5 2h21A3.38 3.38.0 0129 3a3.36 3.36.0 011 2.46V26.37a3.35 3.35.0 01-1 2.47 3.38 3.38.0 01-2.51 1.02zm-5.38-6.71a.79.79.0 00.85-.66L24.73 9.24a.55.55.0 00-.18-.46.62.62.0 00-.41-.17q-.08.0-16.53 6.11a.59.59.0 00-.41.59.57.57.0 00.43.52l4 1.24 1.61 4.83a.62.62.0 00.63.43.56.56.0 00.4-.17L16.54 20l4.09 3A.9.9.0 0021.11 23.15zM13.8 20.71l-1.21-4q8.72-5.55 8.78-5.55c.15.0.23.0.23.16a.18.18.0 010 .06s-2.51 2.3-7.52 6.8z"/></svg></a></li><li><a target=_blank rel="noopener noreferrer" aria-label="share Long-Horizon VLA：任务状态、规划、执行与编排 on ycombinator" href="https://news.ycombinator.com/submitlink?t=Long-Horizon%20VLA%ef%bc%9a%e4%bb%bb%e5%8a%a1%e7%8a%b6%e6%80%81%e3%80%81%e8%a7%84%e5%88%92%e3%80%81%e6%89%a7%e8%a1%8c%e4%b8%8e%e7%bc%96%e6%8e%92&u=https%3a%2f%2fletsgetai.github.io%2fposts%2flong-horizon-vla-task-state-planning-orchestration%2f"><svg width="30" height="30" viewBox="0 0 512 512" fill="currentColor"><path d="M449.446.0C483.971.0 512 28.03 512 62.554V449.446C512 483.97 483.97 512 449.446 512H62.554C28.03 512 0 483.97.0 449.446V62.554C0 28.03 28.029.0 62.554.0H449.446zM183.8767 87.9921h-62.034L230.6673 292.4508V424.0079h50.6655V292.4508L390.1575 87.9921H328.1233L256 238.2489z"/></svg></a></li></ul></footer></article></main><footer class=footer><span>&copy; 2026 <a href=https://letsgetai.github.io/>The Herta</a></span> ·
+<span>Powered by
+<a href="https://gohugo.io/?utm_source=papermod" rel=noopener target=_blank>Hugo</a> &
+<a href=https://github.com/adityatelange/hugo-PaperMod/ rel=noopener target=_blank>PaperMod</a></span></footer><a href=#top id=top-link class="top-link hidden" aria-label="go to top" title="Go to Top (Alt + G)" accesskey=g><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevrons-up"><polyline points="17 11 12 6 7 11"/><polyline points="17 18 12 13 7 18"/></svg>
+</a><script>let menu=document.getElementById("menu");if(menu){const e=localStorage.getItem("menu-scroll-position");e&&(menu.scrollLeft=parseInt(e,10)),menu.onscroll=function(){localStorage.setItem("menu-scroll-position",menu.scrollLeft)}}document.querySelectorAll('a[href^="#"]').forEach(e=>{e.addEventListener("click",function(e){e.preventDefault();var t=this.getAttribute("href").substr(1);window.matchMedia("(prefers-reduced-motion: reduce)").matches?document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView():document.querySelector(`[id='${decodeURIComponent(t)}']`).scrollIntoView({behavior:"smooth"}),t==="top"?history.replaceState(null,null," "):history.pushState(null,null,`#${t}`)})})</script><script>var toplink=document.getElementById("top-link");window.onscroll=function(){const e=window.innerHeight;document.body.scrollTop>e||document.documentElement.scrollTop>e?toplink.classList.remove("hidden"):toplink.classList.add("hidden")}</script><script>document.getElementById("theme-toggle").addEventListener("click",()=>{const e=document.querySelector("html");e.dataset.theme==="dark"?(e.dataset.theme="light",localStorage.setItem("pref-theme","light")):(e.dataset.theme="dark",localStorage.setItem("pref-theme","dark"))})</script><script>document.querySelectorAll("pre > code").forEach(e=>{const n=e.parentNode.parentNode,t=document.createElement("button");t.classList.add("copy-code"),t.innerHTML="复制";function s(){t.innerHTML="已复制！",setTimeout(()=>{t.innerHTML="复制"},2e3)}t.addEventListener("click",t=>{if("clipboard"in navigator){navigator.clipboard.writeText(e.textContent),s();return}const n=document.createRange();n.selectNodeContents(e);const o=window.getSelection();o.removeAllRanges(),o.addRange(n);try{document.execCommand("copy"),s()}catch{}o.removeRange(n)}),n.classList.contains("highlight")?n.appendChild(t):n.parentNode.firstChild==n||(e.parentNode.parentNode.parentNode.parentNode.parentNode.nodeName=="TABLE"?e.parentNode.parentNode.parentNode.parentNode.parentNode.appendChild(t):e.parentNode.appendChild(t))})</script></body></html>
