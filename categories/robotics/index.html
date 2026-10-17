@@ -17,7 +17,7 @@ $$ \text{当前看到什么} + \text{当前要做什么} \rightarrow \text{接�
 机器人不只需要知道“现在怎么抓这个杯子”，还必须持续回答：
 之前已经做过什么？ 哪些任务已经完成？ 当前 subtask 做到什么程度？ 刚才那一步到底成功了吗？ 当前状态和预期是否一致？ 原来的计划还有效吗？ 现在应该继续、重试、恢复，还是重新规划？ 如果有多个未来选择，哪个更好？ 因此 Long-Horizon 的核心问题可以写成：
 $$ \boxed{ \text{如何在持续环境交互中维护一个可靠的 Task State， 并据此持续决策？} } $$机器人其实一直都有环境反馈：
-...</p></div><footer class=entry-footer><span title='2026-10-18 00:00:00 +0000 UTC'>2026-10-18</span>&nbsp;·&nbsp;<span>10 分钟</span>&nbsp;·&nbsp;<span>2123 字</span>&nbsp;·&nbsp;<span>LetsGetAI</span></footer><a class=entry-link aria-label="post link to Long-Horizon VLA：任务状态、规划、执行与编排" href=https://letsgetai.github.io/posts/long-horizon-vla-task-state-planning-orchestration/></a></article><article class="post-entry tag-entry"><header class=entry-header><h2 class=entry-hint-parent>VLA：动作建模与通用机器人策略</h2></header><div class=entry-content><p>VLA 的发展有两条线。
+...</p></div><footer class=entry-footer><span title='2026-10-18 00:00:00 +0000 UTC'>2026-10-18</span>&nbsp;·&nbsp;<span>11 分钟</span>&nbsp;·&nbsp;<span>2283 字</span>&nbsp;·&nbsp;<span>LetsGetAI</span></footer><a class=entry-link aria-label="post link to Long-Horizon VLA：任务状态、规划、执行与编排" href=https://letsgetai.github.io/posts/long-horizon-vla-task-state-planning-orchestration/></a></article><article class="post-entry tag-entry"><header class=entry-header><h2 class=entry-hint-parent>VLA：动作建模与通用机器人策略</h2></header><div class=entry-content><p>VLA 的发展有两条线。
 一条来自机器人领域本身：动作到底应该怎么表示、怎么生成？
 另一条来自大模型：已经非常成功的 Transformer / VLM，能不能直接变成一个通用机器人 policy？
 前一条路线从 Behavior Cloning、Action Chunking 一直走到 Diffusion Policy；后一条路线则从 RT-1、RT-2、OpenVLA 逐渐把 vision、language、action 都塞进统一的 token / autoregressive 范式。
