@@ -6,7 +6,6 @@
 
 ## 文章
 
-- [工作型数字 Agent：环境分类、两根趋势与可展示案例](https://letsgetai.github.io/posts/digital-agent-environments-2026/)
 - [AI 写文档为什么会写偏和被污染：根因与三层解法](https://letsgetai.github.io/posts/ai-writing-context-isolation/)
 - [用 Agent 做 DSL 算子的结构级优化：现在能做到什么程度](https://letsgetai.github.io/posts/dsl-operator-agent-optimization/)
 - [约束解码的生成：从逐 token 采样，到"知道下一步是什么"](https://letsgetai.github.io/posts/constrained-decoding/)
