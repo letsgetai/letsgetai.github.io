@@ -5,273 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow, noarchive">
 <title>具身智能体（Embodied Agents）与控制运行时深度调研：从综述索引到外挂架构与开源生态</title>
-<style>
-
-:root {
-  color-scheme: light dark;
-  --bg: #f6f4ef;
-  --paper: #fffcf8;
-  --ink: #1c1915;
-  --ink-soft: #44403a;
-  --muted: #605c56;
-  --line: #e4dfd6;
-  --link: #1e40af;
-  --link-hover: #1e3a8a;
-  --visited: #5b21b6;
-  --cite: #7c2d12;
-  --panel: #f3f0e8;
-  --strong: #14120f;
-  --focus: #1d4ed8;
-  --header-bg: #f3efe6;
-  --shadow: 0 1px 0 rgba(28, 25, 21, 0.04);
-  --max-prose: 40.5rem;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #141311;
-    --paper: #1b1a17;
-    --ink: #f4f0e7;
-    --ink-soft: #d9d3c7;
-    --muted: #b7b0a4;
-    --line: #34312b;
-    --link: #9ec5ff;
-    --link-hover: #d3e4ff;
-    --visited: #d8b4fe;
-    --cite: #fdba74;
-    --panel: #23211c;
-    --strong: #fffaf3;
-    --focus: #93c5fd;
-    --header-bg: #26231d;
-    --shadow: none;
-  }
-}
-* { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--ink);
-  font-family: "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Noto Sans SC",
-    "Source Han Sans SC", "Microsoft YaHei", "Segoe UI", system-ui, sans-serif;
-  font-size: 1.0625rem;
-  line-height: 1.85;
-  text-rendering: optimizeLegibility;
-  overflow-x: clip;
-}
-.skip {
-  position: absolute;
-  left: 0.75rem;
-  top: 0.75rem;
-  padding: 0.4rem 0.7rem;
-  background: var(--paper);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  transform: translateY(-150%);
-  z-index: 5;
-}
-.skip:focus { transform: none; }
-.shell {
-  width: min(100%, 46rem);
-  margin: 0 auto;
-  padding: 1.35rem 1.15rem 4.5rem;
-}
-main { min-width: 0; }
-h1, h2, h3, strong { color: var(--strong); font-weight: 700; }
-h1 {
-  font-size: clamp(1.48rem, 1.1rem + 1.5vw, 1.95rem);
-  line-height: 1.35;
-  margin: 0.15rem 0 1.25rem;
-  letter-spacing: 0.01em;
-}
-h2 {
-  font-size: 1.28rem;
-  line-height: 1.45;
-  margin: 2.5rem 0 0.95rem;
-  padding-top: 1.25rem;
-  border-top: 1px solid var(--line);
-  scroll-margin-top: 0.8rem;
-}
-p { margin: 0 0 1.05em; }
-a {
-  color: var(--link);
-  text-decoration-thickness: 1px;
-  text-underline-offset: 0.16em;
-  overflow-wrap: anywhere;
-}
-a:hover { color: var(--link-hover); }
-a:visited { color: var(--visited); }
-a:focus-visible, summary:focus-visible, .table-scroll:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-}
-sup {
-  font-size: 0.72em;
-  font-weight: 700;
-  line-height: 0;
-  position: relative;
-  top: -0.42em;
-  margin-left: 0.12em;
-}
-sup a, sup a:visited {
-  color: var(--cite);
-  text-decoration: none;
-  font-variant-numeric: tabular-nums;
-}
-sup a:hover, sup a:focus-visible { text-decoration: underline; }
-.toc-desktop { display: none; }
-.toc-mobile {
-  margin: 0 0 1.4rem;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-}
-.toc-mobile summary {
-  cursor: pointer;
-  font-weight: 700;
-  padding: 0.75rem 0.95rem;
-  list-style: none;
-}
-.toc-mobile summary::-webkit-details-marker { display: none; }
-.toc-mobile summary::before {
-  content: "▸";
-  display: inline-block;
-  margin-right: 0.45rem;
-  color: var(--muted);
-  transform: translateY(-0.05em);
-}
-.toc-mobile[open] summary::before { content: "▾"; }
-.toc-mobile summary:hover { color: var(--link); }
-.toc ol, .toc-desktop ol {
-  list-style: none;
-  margin: 0;
-  padding: 0.15rem 0.85rem 0.85rem 0.95rem;
-  counter-reset: toc;
-}
-.toc-desktop ol { padding: 0; }
-.toc li, .toc-desktop li { margin: 0; counter-increment: toc; }
-.toc a, .toc-desktop a {
-  display: block;
-  padding: 0.38rem 0.35rem 0.38rem 0.15rem;
-  color: var(--ink-soft);
-  text-decoration: none;
-  line-height: 1.45;
-  font-size: 0.92rem;
-  border-left: 2px solid transparent;
-}
-.toc-desktop a { padding-left: 0.7rem; }
-.toc a::before, .toc-desktop a::before {
-  content: counter(toc) "  ";
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.toc a:hover, .toc-desktop a:hover,
-.toc a:focus-visible, .toc-desktop a:focus-visible {
-  color: var(--link);
-  border-left-color: var(--link);
-}
-.table-scroll {
-  overflow-x: auto;
-  max-width: 100%;
-  margin: 1.35rem 0 1.7rem;
-  background: var(--paper);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-  -webkit-overflow-scrolling: touch;
-}
-table {
-  width: max-content;
-  min-width: 100%;
-  border-collapse: collapse;
-  font-size: 0.92rem;
-  line-height: 1.6;
-}
-th, td {
-  padding: 0.62rem 0.78rem;
-  text-align: left;
-  vertical-align: top;
-  border-bottom: 1px solid var(--line);
-  min-width: 10.5rem;
-  max-width: 20rem;
-  overflow-wrap: anywhere;
-}
-thead th {
-  background: var(--header-bg);
-  font-weight: 700;
-  position: sticky;
-  top: 0;
-}
-tbody tr:last-child td { border-bottom: 0; }
-ol.refs {
-  margin: 0.4rem 0 0;
-  padding-left: 1.7rem;
-  font-size: 0.95rem;
-  line-height: 1.65;
-}
-ol.refs li {
-  margin: 0 0 0.72rem;
-  padding-left: 0.25rem;
-  scroll-margin-top: 0.8rem;
-}
-ol.refs li::marker {
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-.backtop {
-  margin-top: 2.4rem;
-  font-size: 0.95rem;
-}
-code, pre {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 0.9em;
-}
-code {
-  background: var(--panel);
-  padding: 0.08em 0.32em;
-  border-radius: 4px;
-}
-@media (min-width: 1120px) {
-  .shell {
-    width: min(100% - 3rem, 64rem);
-    display: grid;
-    grid-template-columns: 16.5rem minmax(0, var(--max-prose));
-    column-gap: 3rem;
-    justify-content: center;
-    align-items: start;
-    padding: 2.4rem 0 5rem;
-  }
-  .toc-mobile { display: none; }
-  .toc-desktop {
-    display: block;
-    position: sticky;
-    top: 1.25rem;
-    max-height: calc(100vh - 2.5rem);
-    overflow: auto;
-    padding-right: 0.4rem;
-  }
-  .toc-desktop .label {
-    margin: 0 0 0.55rem;
-    padding-left: 0.7rem;
-    color: var(--muted);
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-  }
-}
-@media (max-width: 640px) {
-  body { font-size: 1.02rem; line-height: 1.82; }
-  .shell { padding: 1rem 0.9rem 3.5rem; }
-  h1 { margin-bottom: 1rem; }
-  h2 { font-size: 1.16rem; }
-  th, td { min-width: 9.2rem; max-width: 16rem; padding: 0.55rem 0.62rem; }
-}
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-}
-
-</style>
+<link rel="stylesheet" href="/report-reading.css">
 </head>
 <body>
 <a class="skip" href="#article">跳到正文</a>
@@ -296,6 +30,7 @@ code {
 <li><a href="#references">引用的著作</a></li>
 </ol></nav></details>
 <article id="article">
+<p class="index-link"><a href="/b7b38a5beeaa0614c5f52120/">调研索引</a></p>
 <h1 id="top">具身智能体（Embodied Agents）与控制运行时深度调研：从综述索引到外挂架构与开源生态</h1>
 <p>截至 2026 年 11 月，具身智能（Embodied AI）领域的技术演进正沿着两条互补且并行的主线推进：一条是以 Figure AI Helix 02 与 Google DeepMind Gemini Robotics 2 为代表的“端到端全身神经网络栈”<sup><a href="#ref-1">1</a></sup>，另一条则是以 GitHub 开源项目与 arXiv 论文密集涌现的“具身智能体外挂运行时（Embodied Agent Harness）”<sup><a href="#ref-4">4</a></sup>。从 benchflow-ai/awesome-embodied-agents、wadeKeith/Awesome-Embodied-AI 等社区精选索引<sup><a href="#ref-4">4</a></sup>，以及 2026 年 11 月发布的综述《Beyond the Model: A Survey of Harness Software for Embodied Agents》出发<sup><a href="#ref-6">6</a></sup>，多篇近期研究与综述指出：单纯扩大视觉-语言-动作模型（VLA）的参数规模或拉长观测上下文窗口，仍难以根本消除长程物理操作中的历史记忆遗忘、执行前可行性校验缺失与异常级联崩溃问题<sup><a href="#ref-9">9</a></sup>。</p>
 <p>2026 年以来，围绕“外挂运行时编排、显式记忆、状态校验与自我演化”的技术路线，研究界与开源社区陆续推出了 Harness VLA（开源仓库 RLinf/RPent）、Zetta、HELM / HeLM、HarnessPAI、SHAPER、SERA 与 ROSClaw 等代表性工作<sup><a href="#ref-5">5</a></sup>。在抗扰动桌面操作与家居操作基准（如 LIBERO-Pro 与 RoboCasa365）上，外挂架构在不微调底层 VLA 权重的前提下取得了 25.4 至 61.6 个百分点的任务成功率提升<sup><a href="#ref-5">5</a></sup>；而在系统工程侧，基于 MCP（Model Context Protocol）与 ROS 2 执行层契约的中间件已将 Claude Code、Codex、OpenClaw 等编码与推理智能体直接接入仿真器及真实机器人硬件<sup><a href="#ref-17">17</a></sup>。</p>
@@ -305,14 +40,142 @@ code {
 <p>在综述维度，2026 年 10 月至 11 月的一批文献首次将“模型之外的运行时软件（Harness Software）”从传统模型中心视角中剥离出来，作为独立的研究对象进行分类建模<sup><a href="#ref-6">6</a></sup>。2026 年 11 月发表于 Preprints.org 的《Beyond the Model: A Survey of Harness Software for Embodied Agents》（DOI: 10.20944/preprints202611.1642.v1）系统筛选了 2022 至 2026 年间的跨会议文献（其中约五分之一为反映前沿动态的预印本与非存档手稿），并提出了涵盖五项核心职责的参考架构：技能获取（Skill Acquisition）、记忆（Memory）、监控（Monitoring）、规划（Planning）与自我演化（Self-Evolution），工作流横跨在线执行与离线维护双阶段<sup><a href="#ref-6">6</a></sup>。该综述同时梳理了两篇同期并发的运行时综述：Zeng 等人从基座模型外部运行步骤切入划分六项功能职责，而 Huang 等人则将 Harness 界定为治理技能调用的控制平面<sup><a href="#ref-13">13</a></sup>。</p>
 <p>在细分专题综述方面，2026 年 10 月的三篇代表作进一步厘清了记忆、递归自改进与控制周期的理论边界。论文 arXiv:2610.41688v1 建立了机器人策略的记忆分类谱系，将 RT-1、Diffusion Policy、ACT、OpenVLA、Octo 与 π0/π0.5 界定为“无持久记忆基线”，指出固定窗口上下文（Fixed-Window Temporal Context）受限于位置淘汰机制，易造成近因冗余帧挤占早期关键决策线索，并严格区分了回顾视界（Retrospective Horizon）、动作视界（Action Horizon）与预测视界（Predictive Horizon），强调智能体需要状态时效修正以防物体移动引发陈旧信念<sup><a href="#ref-9">9</a></sup>。研究 preprints.org/manuscript/202610.2080 从具身递归自我改进（Embodied RSI）视角，主张将协调接口的 Harness、存储经验的 Memory 与决定更新产物的 Improver 解耦以便准确归因，同时警示对 KV-Cache 管理与压缩的评估必须结合物理动作截止期限、观测陈旧度与任务结果，而不能单纯以每秒 Token 数作为优化指标<sup><a href="#ref-26">26</a></sup>。综述 arXiv:2610.21171v1 则明确区分了在线闭环执行（利用新观测更新物理状态与进度估计而不改写权重）、非参数记忆刷新与离线模型参数微调各自承担的闭环职责<sup><a href="#ref-27">27</a></sup>。</p>
 <p>在 GitHub 开源导航维度，四个主流 Awesome 仓库与两个专题笔记库构成了核心文献雷达<sup><a href="#ref-4">4</a></sup>。其中 benchflow-ai/awesome-embodied-agents 在仓库简介中将“面向编码智能体的机器人 Harness（robot harnesses for coding agents）”单列为核心类别，与机器人模型、世界模型、基准、仿真器和数据集并列（需要说明的是，该仓库 README 全文在本次调研期间未能直接抓取，上述定性依据来自仓库公开介绍与检索片段）<sup><a href="#ref-4">4</a></sup>。wadeKeith/Awesome-Embodied-AI 汇聚了 430 余项跨越 10 大赛道的资源，并专门设立指令安全与策略攻防（SafeVLA、AttackVLA、RoboSafe、VLA-Forget 等 2025–2026 年文献）版块<sup><a href="#ref-7">7</a></sup>。zchoi/Awesome-Embodied-Robotics-and-Agent 与 yuxiang-gao/awesome-embodied-agent 分别聚焦 VLM/LLM 驱动的 VLA 模型迭代与人形机器人通用策略表征<sup><a href="#ref-28">28</a></sup>。此外，ImChong/Robotics_Notebooks 与 will-rice/llm-self-improvement-papers 对 2026 年最新论文和开源仓进行了精细的源码级归档与交叉引用<sup><a href="#ref-30">30</a></sup>。</p>
-<div class="table-scroll" tabindex="0"><table><thead><tr><th><strong>资源类型</strong></th><th><strong>名称</strong></th><th><strong>链接 / 标识</strong></th><th><strong>时间与热度（截至检索源日期）</strong></th><th><strong>核心覆盖范围与定位</strong></th></tr></thead><tbody><tr><td>系统综述</td><td>Beyond the Model: A Survey of Harness Software for Embodied Agents</td><td><a href="https://www.preprints.org/manuscript/202611.1642">https://www.preprints.org/manuscript/202611.1642</a> (DOI: 10.20944/preprints202611.1642.v1)</td><td>2026-11-15/17 预印本<sup><a href="#ref-6">6</a></sup></td><td>定义具身智能体 Harness 五大职责（技能、记忆、监控、规划、自我演化）与在线/离线双阶段参考架构<sup><a href="#ref-6">6</a></sup></td></tr><tr><td>记忆综述</td><td>机器人策略记忆机制谱系研究</td><td><a href="https://arxiv.org/html/2610.41688v1">https://arxiv.org/html/2610.41688v1</a></td><td>2026-10 预印本<sup><a href="#ref-9">9</a></sup></td><td>区分无持久记忆基线与固定窗口上下文，剖析三类时间视界错位与历史状态时效修正<sup><a href="#ref-9">9</a></sup></td></tr><tr><td>理论综述</td><td>具身递归自我改进（Embodied RSI）基础研究</td><td><a href="https://www.preprints.org/manuscript/202610.2080">https://www.preprints.org/manuscript/202610.2080</a></td><td>2026-10 预印本<sup><a href="#ref-26">26</a></sup></td><td>解耦 Harness、Memory 与 Improver 归因边界，剖析 VLA 与世界模型接口及实时缓存延迟权衡<sup><a href="#ref-26">26</a></sup></td></tr><tr><td>领域综述</td><td>物理 AI 与物理交互综述</td><td><a href="https://arxiv.org/html/2610.21171v1">https://arxiv.org/html/2610.21171v1</a></td><td>2026-10 预印本<sup><a href="#ref-27">27</a></sup></td><td>界定在线闭环执行、非参数记忆更新与离线参数训练在物理交互中的控制边界<sup><a href="#ref-27">27</a></sup></td></tr><tr><td>Awesome</td><td>benchflow-ai/awesome-embodied-agents</td><td><a href="https://github.com/benchflow-ai/awesome-embodied-agents">https://github.com/benchflow-ai/awesome-embodied-agents</a></td><td>覆盖 2025–2026<sup><a href="#ref-25">25</a></sup></td><td>专注物理世界智能体，涵盖编码智能体机器人 Harness、VLA、世界模型与仿真基准（README 正文提取受限，仅元数据可考）<sup><a href="#ref-4">4</a></sup></td></tr><tr><td>Awesome</td><td>wadeKeith/Awesome-Embodied-AI</td><td><a href="https://github.com/wadeKeith/Awesome-Embodied-AI">https://github.com/wadeKeith/Awesome-Embodied-AI</a></td><td>255 Stars / 28 Forks<sup><a href="#ref-7">7</a></sup></td><td>430+ 项资源跨越 10 大赛道，含 SafeVLA、AttackVLA、RoboSafe、VLA-Forget 等 2025–2026 安全专题<sup><a href="#ref-7">7</a></sup></td></tr><tr><td>Awesome</td><td>zchoi/Awesome-Embodied-Robotics-and-Agent</td><td><a href="https://github.com/zchoi/Awesome-Embodied-Robotics-and-Agent">https://github.com/zchoi/Awesome-Embodied-Robotics-and-Agent</a></td><td>持续更新至 2026<sup><a href="#ref-29">29</a></sup></td><td>追踪 VLM/LLM 驱动的 VLA 模型，覆盖 ABot-M0、π*0.6、Gemini Robotics 1.5、MolmoAct、GR-3、SmolVLA、D2E 等<sup><a href="#ref-29">29</a></sup></td></tr><tr><td>Awesome</td><td>yuxiang-gao/awesome-embodied-agent</td><td><a href="https://github.com/yuxiang-gao/awesome-embodied-agent">https://github.com/yuxiang-gao/awesome-embodied-agent</a></td><td>侧重通用与人形机器人<sup><a href="#ref-28">28</a></sup></td><td>按世界模型（HMA 等）、VLA（π0、UP-VLA）、扩散/自回归模仿学习（adaLN-Zero、CARP）、RL 与触觉模态分类<sup><a href="#ref-28">28</a></sup></td></tr><tr><td>专题索引</td><td>ImChong/Robotics_Notebooks</td><td><a href="https://github.com/ImChong/Robotics_Notebooks">https://github.com/ImChong/Robotics_Notebooks</a></td><td>核对至 2026-08+<sup><a href="#ref-32">32</a></sup></td><td>中文结构化 Wiki 与论文归档，对 Harness VLA、RPent、HarnessPAI、Hi Robot 进行过数据表格级核对<sup><a href="#ref-5">5</a></sup></td></tr><tr><td>专题索引</td><td>will-rice/llm-self-improvement-papers</td><td><a href="https://github.com/will-rice/llm-self-improvement-papers">https://github.com/will-rice/llm-self-improvement-papers</a></td><td>更新至 2026-10+<sup><a href="#ref-31">31</a></sup></td><td>追踪自我改进智能体文献，收录 EmbodiedRSI (arXiv:2610.10498v1) 与 Harness VLA<sup><a href="#ref-31">31</a></sup></td></tr></tbody></table></div>
+<section class="records">
+<article class="record"><dl>
+<div class="field"><dt>资源类型</dt><dd>系统综述</dd></div>
+<div class="field"><dt>名称</dt><dd>Beyond the Model: A Survey of Harness Software for Embodied Agents</dd></div>
+<div class="field"><dt>链接 / 标识</dt><dd><a href="https://www.preprints.org/manuscript/202611.1642">https://www.preprints.org/manuscript/202611.1642</a> (DOI: 10.20944/preprints202611.1642.v1)</dd></div>
+<div class="field"><dt>时间与热度（截至检索源日期）</dt><dd>2026-11-15/17 预印本<sup><a href="#ref-6">6</a></sup></dd></div>
+<div class="field"><dt>核心覆盖范围与定位</dt><dd>定义具身智能体 Harness 五大职责（技能、记忆、监控、规划、自我演化）与在线/离线双阶段参考架构<sup><a href="#ref-6">6</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>资源类型</dt><dd>记忆综述</dd></div>
+<div class="field"><dt>名称</dt><dd>机器人策略记忆机制谱系研究</dd></div>
+<div class="field"><dt>链接 / 标识</dt><dd><a href="https://arxiv.org/html/2610.41688v1">https://arxiv.org/html/2610.41688v1</a></dd></div>
+<div class="field"><dt>时间与热度（截至检索源日期）</dt><dd>2026-10 预印本<sup><a href="#ref-9">9</a></sup></dd></div>
+<div class="field"><dt>核心覆盖范围与定位</dt><dd>区分无持久记忆基线与固定窗口上下文，剖析三类时间视界错位与历史状态时效修正<sup><a href="#ref-9">9</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>资源类型</dt><dd>理论综述</dd></div>
+<div class="field"><dt>名称</dt><dd>具身递归自我改进（Embodied RSI）基础研究</dd></div>
+<div class="field"><dt>链接 / 标识</dt><dd><a href="https://www.preprints.org/manuscript/202610.2080">https://www.preprints.org/manuscript/202610.2080</a></dd></div>
+<div class="field"><dt>时间与热度（截至检索源日期）</dt><dd>2026-10 预印本<sup><a href="#ref-26">26</a></sup></dd></div>
+<div class="field"><dt>核心覆盖范围与定位</dt><dd>解耦 Harness、Memory 与 Improver 归因边界，剖析 VLA 与世界模型接口及实时缓存延迟权衡<sup><a href="#ref-26">26</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>资源类型</dt><dd>领域综述</dd></div>
+<div class="field"><dt>名称</dt><dd>物理 AI 与物理交互综述</dd></div>
+<div class="field"><dt>链接 / 标识</dt><dd><a href="https://arxiv.org/html/2610.21171v1">https://arxiv.org/html/2610.21171v1</a></dd></div>
+<div class="field"><dt>时间与热度（截至检索源日期）</dt><dd>2026-10 预印本<sup><a href="#ref-27">27</a></sup></dd></div>
+<div class="field"><dt>核心覆盖范围与定位</dt><dd>界定在线闭环执行、非参数记忆更新与离线参数训练在物理交互中的控制边界<sup><a href="#ref-27">27</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>资源类型</dt><dd>Awesome</dd></div>
+<div class="field"><dt>名称</dt><dd>benchflow-ai/awesome-embodied-agents</dd></div>
+<div class="field"><dt>链接 / 标识</dt><dd><a href="https://github.com/benchflow-ai/awesome-embodied-agents">https://github.com/benchflow-ai/awesome-embodied-agents</a></dd></div>
+<div class="field"><dt>时间与热度（截至检索源日期）</dt><dd>覆盖 2025–2026<sup><a href="#ref-25">25</a></sup></dd></div>
+<div class="field"><dt>核心覆盖范围与定位</dt><dd>专注物理世界智能体，涵盖编码智能体机器人 Harness、VLA、世界模型与仿真基准（README 正文提取受限，仅元数据可考）<sup><a href="#ref-4">4</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>资源类型</dt><dd>Awesome</dd></div>
+<div class="field"><dt>名称</dt><dd>wadeKeith/Awesome-Embodied-AI</dd></div>
+<div class="field"><dt>链接 / 标识</dt><dd><a href="https://github.com/wadeKeith/Awesome-Embodied-AI">https://github.com/wadeKeith/Awesome-Embodied-AI</a></dd></div>
+<div class="field"><dt>时间与热度（截至检索源日期）</dt><dd>255 Stars / 28 Forks<sup><a href="#ref-7">7</a></sup></dd></div>
+<div class="field"><dt>核心覆盖范围与定位</dt><dd>430+ 项资源跨越 10 大赛道，含 SafeVLA、AttackVLA、RoboSafe、VLA-Forget 等 2025–2026 安全专题<sup><a href="#ref-7">7</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>资源类型</dt><dd>Awesome</dd></div>
+<div class="field"><dt>名称</dt><dd>zchoi/Awesome-Embodied-Robotics-and-Agent</dd></div>
+<div class="field"><dt>链接 / 标识</dt><dd><a href="https://github.com/zchoi/Awesome-Embodied-Robotics-and-Agent">https://github.com/zchoi/Awesome-Embodied-Robotics-and-Agent</a></dd></div>
+<div class="field"><dt>时间与热度（截至检索源日期）</dt><dd>持续更新至 2026<sup><a href="#ref-29">29</a></sup></dd></div>
+<div class="field"><dt>核心覆盖范围与定位</dt><dd>追踪 VLM/LLM 驱动的 VLA 模型，覆盖 ABot-M0、π*0.6、Gemini Robotics 1.5、MolmoAct、GR-3、SmolVLA、D2E 等<sup><a href="#ref-29">29</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>资源类型</dt><dd>Awesome</dd></div>
+<div class="field"><dt>名称</dt><dd>yuxiang-gao/awesome-embodied-agent</dd></div>
+<div class="field"><dt>链接 / 标识</dt><dd><a href="https://github.com/yuxiang-gao/awesome-embodied-agent">https://github.com/yuxiang-gao/awesome-embodied-agent</a></dd></div>
+<div class="field"><dt>时间与热度（截至检索源日期）</dt><dd>侧重通用与人形机器人<sup><a href="#ref-28">28</a></sup></dd></div>
+<div class="field"><dt>核心覆盖范围与定位</dt><dd>按世界模型（HMA 等）、VLA（π0、UP-VLA）、扩散/自回归模仿学习（adaLN-Zero、CARP）、RL 与触觉模态分类<sup><a href="#ref-28">28</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>资源类型</dt><dd>专题索引</dd></div>
+<div class="field"><dt>名称</dt><dd>ImChong/Robotics_Notebooks</dd></div>
+<div class="field"><dt>链接 / 标识</dt><dd><a href="https://github.com/ImChong/Robotics_Notebooks">https://github.com/ImChong/Robotics_Notebooks</a></dd></div>
+<div class="field"><dt>时间与热度（截至检索源日期）</dt><dd>核对至 2026-08+<sup><a href="#ref-32">32</a></sup></dd></div>
+<div class="field"><dt>核心覆盖范围与定位</dt><dd>中文结构化 Wiki 与论文归档，对 Harness VLA、RPent、HarnessPAI、Hi Robot 进行过数据表格级核对<sup><a href="#ref-5">5</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>资源类型</dt><dd>专题索引</dd></div>
+<div class="field"><dt>名称</dt><dd>will-rice/llm-self-improvement-papers</dd></div>
+<div class="field"><dt>链接 / 标识</dt><dd><a href="https://github.com/will-rice/llm-self-improvement-papers">https://github.com/will-rice/llm-self-improvement-papers</a></dd></div>
+<div class="field"><dt>时间与热度（截至检索源日期）</dt><dd>更新至 2026-10+<sup><a href="#ref-31">31</a></sup></dd></div>
+<div class="field"><dt>核心覆盖范围与定位</dt><dd>追踪自我改进智能体文献，收录 EmbodiedRSI (arXiv:2610.10498v1) 与 Harness VLA<sup><a href="#ref-31">31</a></sup></dd></div>
+</dl></article>
+</section>
 <h2 id="harness">核心演进范式：从端到端 VLA 到“外挂运行时（Embodied Harness）”</h2>
 <p>端到端 VLA 模型虽然能够直接从图像与语言映射出连续动作块，但当物体摆放发生空间置换、任务目标微调或操作出现滑脱时，单体策略往往陷入局部重复试探或丢失任务状态<sup><a href="#ref-10">10</a></sup>。2026 年兴起的 Embodied Harness 范式确立了一条新的工程路径：将底层 VLA 降格为处理局部接触动态的“可重试原语（Primitive）”，而把非接触段的空间移动、语义重绑定、异常诊断与经验进化全部剥离至外部运行时软件层<sup><a href="#ref-5">5</a></sup>。</p>
 <p>在开源实现与基准验证方面，清华大学、跨步智能、无问芯穹等机构于 2026 年 7 月推出的 <strong>Harness VLA</strong>（arXiv:2607.08448v3，代码开源于 <a href="https://github.com/RLinf/RPent">https://github.com/RLinf/RPent</a>，记忆语料发布于 Hugging Face RLinf/RPent-memory）具有代表性<sup><a href="#ref-5">5</a></sup>。该框架将冻结的 VLA（分别采用 RLinf 发布的 π0.5-SFT 检查点、RLDX-1 与 LingBot-VLA）暴露为短脉冲接触原语 vla_act，与固定词表的解析原语（move_to、move_pose、rotate_*、set_gripper、release 及移动导航原语）共同交给 Claude Code（CC）或 Codex 规划器以 JSON 形式调用，并在部署阶段严格禁止创造新原语<sup><a href="#ref-5">5</a></sup>。作者对原语调用结构的统计揭示了该方法奏效的核心原因：在标准 LIBERO 上，vla_act 仅占全部原语调用次数的 15.8%，其余 84.2% 的非接触空间过渡均由确定性解析原语承担（RoboCasa365 上 vla_act 占比 35.3%，RoboTwin C2R 上为 47.4%）<sup><a href="#ref-5">5</a></sup>。通过先在参考初始状态上搜索轨迹并沉淀出“任务专属记忆（将绝对坐标符号化为感知查询的 JSONL）”与“全局记忆（可复用规则与失败模式）”，Harness VLA 在抗扰动基准 LIBERO-Pro 上达到 82.4% 成功率（CC 规划器）与 72.1%（Codex 规划器），较 RATS 基线提升 38.6 个百分点（同骨干冻结策略直接运行仅 50.0%）；在 RoboCasa365 上达到 55.4%（较 RLDX-1 的 30.0% 提升 25.4 个百分点），在双臂 RoboTwin C2R 上达到 58.4%<sup><a href="#ref-5">5</a></sup>。2026 年 11 月，无问芯穹与地瓜机器人进一步宣布将 RPent 纳入双方共建的具身开源基础设施矩阵（涵盖 RLark、RLinf、RPent 与 APXInf）<sup><a href="#ref-38">38</a></sup>。</p>
 <p>尽管零训练泛化增益显著，Harness VLA 这类在回合内频繁调用云端大模型 API 进行规划的模式随即暴露出严峻的延迟瓶颈。文献 arXiv:2609.29166v1 实测显示，Harness VLA 在 LIBERO-Pro Swap 与 Task 扰动上的单回合（Rollout）耗时分别达到 1,134.9 秒和 978.1 秒<sup><a href="#ref-23">23</a></sup>；后续基于 RPent 的研究 AgenticRoboRL（arXiv:2610.28589v1）甚至需将单回合上限设为 100 轮规划或 7,200 秒<sup><a href="#ref-22">22</a></sup>。为打破在线慢思考导致的耗时僵局，2026 年下半年迅速演化出两类高效率改进方向。</p>
 <p>第一类方向是<strong>将在线多步规划下沉为“回合间演化的固定控制程序”</strong>。<strong>HarnessPAI</strong>（项目页 <a href="https://darwin-agent.github.io/HarnessPAI/">https://darwin-agent.github.io/HarnessPAI/</a>，当前暂未见关联 arXiv 编号或公开源码仓）主张在单次回合内不调用高层 LLM 推理，而是运行由外部演化循环（定义 → 执行 → 诊断 → 校验与保留）生成的可执行程序，在内部显式组合视觉感知、几何推理、VLA/WAM 原语调用与成功检查，并借助 VLM 诊断与技能记忆在回合之间迭代修补程序逻辑<sup><a href="#ref-15">15</a></sup>。根据其项目页披露的评测数据，HarnessPAI 将 π0.5 在 LIBERO-PRO（Swap + Task）上的总体成功率从 34.9% 推升至 96.5%（+61.6 个百分点），且基于 π0.5 演化的任务程序无需重新演化即可直接迁移至 DreamZero 后端（在 LIBERO-PRO Object 上将 Swap 从 0.6% 提升至 73.4%、Task 从 9.6% 提升至 84.4%）<sup><a href="#ref-15">15</a></sup>。在 LIBERO-Goal Task 1 上，其串行执行速度较 Harness VLA 提升 23.1 倍（Swap）与 18.4 倍（Task），且回合内在线高层 LLM API 费用为零；但项目页亦明确加注限制说明——该加速比仅衡量部署串行执行开销，并未计入程序研发与演化阶段的生命周期成本<sup><a href="#ref-15">15</a></sup>。</p>
 <p>第二类方向是<strong>多时间尺度自演化运行时与本地小模型策略内化</strong>。2026 年 8 月发布的 <strong>Zetta (ζ)</strong>（arXiv:2608.16590，项目页 <a href="https://air-embodied-brain.github.io/zetta/">https://air-embodied-brain.github.io/zetta/</a>，代码仓 air-embodied-brain/Zetta-Embodiment）在冻结底层动作策略与高层仲裁智能体（Orchestrator）的前提下，构建了“动作-批次-迭代”三层协调闭环：利用诊断智能体与演化智能体将失败簇抽象为机制级不变量，在线下迭代改写可执行的<strong>运行时评论家（Critics）、恢复策略（Recovery）与辅助工具（Tools）</strong>，并结合硬件解耦的确定性路由调度层确保多卡仿真环境下批次对比无偏，经过隔离留出集验证后合并版本<sup><a href="#ref-35">35</a></sup>。第三方开源追踪平台 OpenTrain 记录该仓库已收获 1,326 Stars（截至 2026 年 10 月底最后推送），但尚未提供官方发布标签（Tagged Releases）或 Docker 配置，且检索到的论文片段未披露具体分项基准百分数<sup><a href="#ref-41">41</a></sup>。同类免权重更新演化框架还包括同步演化文本技能与上下文代码 Harness 的 <strong>SHAPER</strong>（arXiv:2608.11350v1/v2，验证于 VLABench 与 ESI-Bench）<sup><a href="#ref-42">42</a></sup>、针对历史依赖型操作修订高阶 VLM 上下文规则的 <strong>SERA</strong>（arXiv:2610.29560v1，在 RoboMME 上将成功率从 44.38% 提高至 51.38%）<sup><a href="#ref-14">14</a></sup>、集成六大功能模块的通用框架 <strong>EVA</strong>（OpenReview 匿名评审版本及代码 anonymous.4open.science/r/eva-0，在 VLABench 较基线提升 37.8% 且降低 10.9 倍 Token 开销并已部署于真实人形机器人）<sup><a href="#ref-21">21</a></sup>，以及 2026 年 11 月 20 日最新发布的双智能体递归自改进框架 <strong>Embodied-Harness</strong>（arXiv:2611.27689v1）<sup><a href="#ref-44">44</a></sup>。此外，<strong>AgenticRoboRL</strong>（arXiv:2610.28589v1）探索了另一种彻底摆脱庞大外部记忆与云端 API 的路径：利用 Qwen3.8-27B 配合 Harness VLA 记忆生成的教师轨迹对 Qwen3.5-9B 进行监督微调，再通过 2,304 回合结果奖励强化学习优化规划器；最终，这个 9B 本地规划器在<strong>完全不访问外部记忆文件</strong>的条件下，在 LIBERO-PRO 上的成功率从 18.1% 跃升至 71.0%，几乎追平依赖外部记忆的 Codex (GPT-5.5)（72.1%），并在 CaP-X 框架下将成功率从 2.7% 提高至 28.5%<sup><a href="#ref-22">22</a></sup>。</p>
-<div class="table-scroll" tabindex="0"><table><thead><tr><th><strong>系统名称</strong></th><th><strong>arXiv / 来源</strong></th><th><strong>GitHub / 项目页</strong></th><th><strong>冻结与演化边界</strong></th><th><strong>核心定量结果与已披露局限</strong></th></tr></thead><tbody><tr><td>Harness VLA (RPent)</td><td>arXiv:2607.08448v3<sup><a href="#ref-5">5</a></sup></td><td><a href="https://github.com/RLinf/RPent">https://github.com/RLinf/RPent</a> / <a href="https://harnessvla.github.io/">https://harnessvla.github.io/</a><sup><a href="#ref-5">5</a></sup></td><td>冻结 VLA（作为 vla_act）与解析原语表；演化 Task/Global Memory<sup><a href="#ref-5">5</a></sup></td><td>LIBERO-Pro 82.4%（+38.6 pp vs RATS）；RoboCasa365 55.4%（+25.4 pp）；RoboTwin C2R 58.4%<sup><a href="#ref-5">5</a></sup>。单回合耗时约 978–1,135 秒<sup><a href="#ref-23">23</a></sup>，规划器与 VLA 间仍属开环反馈<sup><a href="#ref-5">5</a></sup></td></tr><tr><td>HarnessPAI</td><td>作者项目页<sup><a href="#ref-15">15</a></sup>；Wiki 归档<sup><a href="#ref-33">33</a></sup></td><td><a href="https://darwin-agent.github.io/HarnessPAI/">https://darwin-agent.github.io/HarnessPAI/</a><sup><a href="#ref-15">15</a></sup>（暂未见公开代码仓与 arXiv 编号）</td><td>单回合内代码固定；回合间利用 VLM 诊断演化可执行程序与技能记忆<sup><a href="#ref-15">15</a></sup></td><td>项目页报告 LIBERO-PRO Swap+Task 96.5%（+61.6 pp vs π0.5）；串行速度较 Harness VLA 快 18.4×–23.1×；收集成功轨迹微调 π0.5 提至 73.7%<sup><a href="#ref-15">15</a></sup>。加速比未计入演化开发成本，尚缺独立复现<sup><a href="#ref-15">15</a></sup></td></tr><tr><td>Zetta (ζ)</td><td>arXiv:2608.16590v1<sup><a href="#ref-35">35</a></sup></td><td><a href="https://github.com/air-embodied-brain/Zetta-Embodiment">https://github.com/air-embodied-brain/Zetta-Embodiment</a> / <a href="https://air-embodied-brain.github.io/zetta/">https://air-embodied-brain.github.io/zetta/</a><sup><a href="#ref-41">41</a></sup></td><td>冻结动作策略与 Orchestrator；三尺度闭环演化代码级 Critics、Recovery 与 Tools<sup><a href="#ref-35">35</a></sup></td><td>配备确定性资源调度与留出集验证<sup><a href="#ref-35">35</a></sup>；第三方索引 OpenTrain 显示 1,326 Stars（无 tagged releases 与 Docker 配置）<sup><a href="#ref-41">41</a></sup>；已检索片段未列分项百分数</td></tr><tr><td>SHAPER</td><td>arXiv:2608.11350v1 / v2<sup><a href="#ref-42">42</a></sup></td><td>论文提出免训练非参数优化系统<sup><a href="#ref-43">43</a></sup></td><td>冻结规划器与执行器权重；共演化可复用文本技能与上下文代码 Harness<sup><a href="#ref-14">14</a></sup></td><td>在 VLABench（委托冻结 VLA 执行子目标）与 ESI-Bench 验证自我演化适应性<sup><a href="#ref-43">43</a></sup></td></tr><tr><td>SERA</td><td>arXiv:2610.29560v1<sup><a href="#ref-14">14</a></sup></td><td>论文披露可编辑规划 Harness<sup><a href="#ref-14">14</a></sup></td><td>冻结 VLA 执行器；利用开发期经验修订高阶 VLM 上下文管理与评估规则<sup><a href="#ref-14">14</a></sup></td><td>RoboMME 总体成功率 51.38% vs 无自演化 44.38%（+7.00 pp）<sup><a href="#ref-14">14</a></sup>；失败恢复稳定性仍待突破<sup><a href="#ref-14">14</a></sup></td></tr><tr><td>EVA</td><td>OpenReview 匿名稿<sup><a href="#ref-21">21</a></sup></td><td><a href="https://anonymous.4open.science/r/eva-0">https://anonymous.4open.science/r/eva-0</a><sup><a href="#ref-21">21</a></sup></td><td>不修改模型参数；集成感知、记忆、规划、执行、监控、校验六模块<sup><a href="#ref-21">21</a></sup></td><td>VLABench 较强基线提升 37.8%，Token 开销降 10.9×，已部署至真实人形机器人<sup><a href="#ref-21">21</a></sup></td></tr><tr><td>AgenticRoboRL</td><td>arXiv:2610.28589v1<sup><a href="#ref-22">22</a></sup></td><td>基于 RPent 与 CaP-X 适配器实现<sup><a href="#ref-22">22</a></sup></td><td>冻结执行层与 VLA；对 Qwen3.5-9B 规划器实施教师轨迹 SFT + RL<sup><a href="#ref-22">22</a></sup></td><td>LIBERO-PRO 无外部记忆从 18.1% 升至 71.0%，CaP-X 从 2.7% 升至 28.5%<sup><a href="#ref-22">22</a></sup>；另于 LIBERO-Plus 10,030 种配置测试零样本泛化<sup><a href="#ref-22">22</a></sup></td></tr><tr><td>Embodied-Harness</td><td>arXiv:2611.27689v1<sup><a href="#ref-44">44</a></sup></td><td>2026-11-20 最新预印本<sup><a href="#ref-44">44</a></sup></td><td>不更新模型参数；双智能体递归自改进执行 Harness<sup><a href="#ref-44">44</a></sup></td><td>主攻空间与环境变化下的递归自改进与泛化鲁棒性<sup><a href="#ref-44">44</a></sup></td></tr></tbody></table></div>
+<section class="records">
+<article class="record"><dl>
+<div class="field"><dt>系统名称</dt><dd>Harness VLA (RPent)</dd></div>
+<div class="field"><dt>arXiv / 来源</dt><dd>arXiv:2607.08448v3<sup><a href="#ref-5">5</a></sup></dd></div>
+<div class="field"><dt>GitHub / 项目页</dt><dd><a href="https://github.com/RLinf/RPent">https://github.com/RLinf/RPent</a> / <a href="https://harnessvla.github.io/">https://harnessvla.github.io/</a><sup><a href="#ref-5">5</a></sup></dd></div>
+<div class="field"><dt>冻结与演化边界</dt><dd>冻结 VLA（作为 vla_act）与解析原语表；演化 Task/Global Memory<sup><a href="#ref-5">5</a></sup></dd></div>
+<div class="field"><dt>核心定量结果与已披露局限</dt><dd>LIBERO-Pro 82.4%（+38.6 pp vs RATS）；RoboCasa365 55.4%（+25.4 pp）；RoboTwin C2R 58.4%<sup><a href="#ref-5">5</a></sup>。单回合耗时约 978–1,135 秒<sup><a href="#ref-23">23</a></sup>，规划器与 VLA 间仍属开环反馈<sup><a href="#ref-5">5</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>系统名称</dt><dd>HarnessPAI</dd></div>
+<div class="field"><dt>arXiv / 来源</dt><dd>作者项目页<sup><a href="#ref-15">15</a></sup>；Wiki 归档<sup><a href="#ref-33">33</a></sup></dd></div>
+<div class="field"><dt>GitHub / 项目页</dt><dd><a href="https://darwin-agent.github.io/HarnessPAI/">https://darwin-agent.github.io/HarnessPAI/</a><sup><a href="#ref-15">15</a></sup>（暂未见公开代码仓与 arXiv 编号）</dd></div>
+<div class="field"><dt>冻结与演化边界</dt><dd>单回合内代码固定；回合间利用 VLM 诊断演化可执行程序与技能记忆<sup><a href="#ref-15">15</a></sup></dd></div>
+<div class="field"><dt>核心定量结果与已披露局限</dt><dd>项目页报告 LIBERO-PRO Swap+Task 96.5%（+61.6 pp vs π0.5）；串行速度较 Harness VLA 快 18.4×–23.1×；收集成功轨迹微调 π0.5 提至 73.7%<sup><a href="#ref-15">15</a></sup>。加速比未计入演化开发成本，尚缺独立复现<sup><a href="#ref-15">15</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>系统名称</dt><dd>Zetta (ζ)</dd></div>
+<div class="field"><dt>arXiv / 来源</dt><dd>arXiv:2608.16590v1<sup><a href="#ref-35">35</a></sup></dd></div>
+<div class="field"><dt>GitHub / 项目页</dt><dd><a href="https://github.com/air-embodied-brain/Zetta-Embodiment">https://github.com/air-embodied-brain/Zetta-Embodiment</a> / <a href="https://air-embodied-brain.github.io/zetta/">https://air-embodied-brain.github.io/zetta/</a><sup><a href="#ref-41">41</a></sup></dd></div>
+<div class="field"><dt>冻结与演化边界</dt><dd>冻结动作策略与 Orchestrator；三尺度闭环演化代码级 Critics、Recovery 与 Tools<sup><a href="#ref-35">35</a></sup></dd></div>
+<div class="field"><dt>核心定量结果与已披露局限</dt><dd>配备确定性资源调度与留出集验证<sup><a href="#ref-35">35</a></sup>；第三方索引 OpenTrain 显示 1,326 Stars（无 tagged releases 与 Docker 配置）<sup><a href="#ref-41">41</a></sup>；已检索片段未列分项百分数</dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>系统名称</dt><dd>SHAPER</dd></div>
+<div class="field"><dt>arXiv / 来源</dt><dd>arXiv:2608.11350v1 / v2<sup><a href="#ref-42">42</a></sup></dd></div>
+<div class="field"><dt>GitHub / 项目页</dt><dd>论文提出免训练非参数优化系统<sup><a href="#ref-43">43</a></sup></dd></div>
+<div class="field"><dt>冻结与演化边界</dt><dd>冻结规划器与执行器权重；共演化可复用文本技能与上下文代码 Harness<sup><a href="#ref-14">14</a></sup></dd></div>
+<div class="field"><dt>核心定量结果与已披露局限</dt><dd>在 VLABench（委托冻结 VLA 执行子目标）与 ESI-Bench 验证自我演化适应性<sup><a href="#ref-43">43</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>系统名称</dt><dd>SERA</dd></div>
+<div class="field"><dt>arXiv / 来源</dt><dd>arXiv:2610.29560v1<sup><a href="#ref-14">14</a></sup></dd></div>
+<div class="field"><dt>GitHub / 项目页</dt><dd>论文披露可编辑规划 Harness<sup><a href="#ref-14">14</a></sup></dd></div>
+<div class="field"><dt>冻结与演化边界</dt><dd>冻结 VLA 执行器；利用开发期经验修订高阶 VLM 上下文管理与评估规则<sup><a href="#ref-14">14</a></sup></dd></div>
+<div class="field"><dt>核心定量结果与已披露局限</dt><dd>RoboMME 总体成功率 51.38% vs 无自演化 44.38%（+7.00 pp）<sup><a href="#ref-14">14</a></sup>；失败恢复稳定性仍待突破<sup><a href="#ref-14">14</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>系统名称</dt><dd>EVA</dd></div>
+<div class="field"><dt>arXiv / 来源</dt><dd>OpenReview 匿名稿<sup><a href="#ref-21">21</a></sup></dd></div>
+<div class="field"><dt>GitHub / 项目页</dt><dd><a href="https://anonymous.4open.science/r/eva-0">https://anonymous.4open.science/r/eva-0</a><sup><a href="#ref-21">21</a></sup></dd></div>
+<div class="field"><dt>冻结与演化边界</dt><dd>不修改模型参数；集成感知、记忆、规划、执行、监控、校验六模块<sup><a href="#ref-21">21</a></sup></dd></div>
+<div class="field"><dt>核心定量结果与已披露局限</dt><dd>VLABench 较强基线提升 37.8%，Token 开销降 10.9×，已部署至真实人形机器人<sup><a href="#ref-21">21</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>系统名称</dt><dd>AgenticRoboRL</dd></div>
+<div class="field"><dt>arXiv / 来源</dt><dd>arXiv:2610.28589v1<sup><a href="#ref-22">22</a></sup></dd></div>
+<div class="field"><dt>GitHub / 项目页</dt><dd>基于 RPent 与 CaP-X 适配器实现<sup><a href="#ref-22">22</a></sup></dd></div>
+<div class="field"><dt>冻结与演化边界</dt><dd>冻结执行层与 VLA；对 Qwen3.5-9B 规划器实施教师轨迹 SFT + RL<sup><a href="#ref-22">22</a></sup></dd></div>
+<div class="field"><dt>核心定量结果与已披露局限</dt><dd>LIBERO-PRO 无外部记忆从 18.1% 升至 71.0%，CaP-X 从 2.7% 升至 28.5%<sup><a href="#ref-22">22</a></sup>；另于 LIBERO-Plus 10,030 种配置测试零样本泛化<sup><a href="#ref-22">22</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>系统名称</dt><dd>Embodied-Harness</dd></div>
+<div class="field"><dt>arXiv / 来源</dt><dd>arXiv:2611.27689v1<sup><a href="#ref-44">44</a></sup></dd></div>
+<div class="field"><dt>GitHub / 项目页</dt><dd>2026-11-20 最新预印本<sup><a href="#ref-44">44</a></sup></dd></div>
+<div class="field"><dt>冻结与演化边界</dt><dd>不更新模型参数；双智能体递归自改进执行 Harness<sup><a href="#ref-44">44</a></sup></dd></div>
+<div class="field"><dt>核心定量结果与已披露局限</dt><dd>主攻空间与环境变化下的递归自改进与泛化鲁棒性<sup><a href="#ref-44">44</a></sup></dd></div>
+</dl></article>
+</section>
 <h2 id="memory">长程记忆与执行校验机制深度拆解（含同名 HELM / HeLM 辨析）</h2>
 <p>检索 2026 年具身记忆文献时极易遭遇一处名称碰撞：两篇分别于 2026 年 4 月和 11 月发表的独立研究均以“HELM / HeLM”命名，但二者在记忆载体、问题焦点与系统层级上截然不同<sup><a href="#ref-12">12</a></sup>。</p>
 <p>第一篇是 Zeng 等人于 2026 年 4 月发布的 <strong>HELM（Harness-Enhanced Long-horizon Memory，arXiv:2604.18791）</strong><sup><a href="#ref-16">16</a></sup>。作者通过系统性剖析揭示了单步 VLA 在长程操作中反复出现的三大执行循环缺口：固定窗口遗忘已完成子目标（例如在 t=47 步无法记起 t=12 步已将杯子放入橱柜而重复抓取）导致的<strong>记忆缺口（FM）</strong>、缺乏前置可行性判断导致错误抓取或越界运动静默执行的<strong>校验缺口（FV）</strong>，以及某一步失败后策略在受损状态下继续推进引发级联失败的<strong>恢复缺口（FR）</strong><sup><a href="#ref-10">10</a></sup>。为此，HELM 在冻结 VLA 外部构建了情景记忆模块（EMM，基于 CLIP ViT-B/32 嵌入索引关键帧与深度估计状态增量，在子目标完成、检测到失败或每 20 步写入，容量上限 50 条，按余弦相似度检索 Top-3 序列化为文本注入 VLA 语言输入）、记忆条件化的预执行失败预测器<strong>状态校验器（SV）</strong>，以及触发状态回滚或前向恢复的<strong>控制模块（HC）</strong>，并伴随发布故障注入评测协议 LIBERO-Recovery<sup><a href="#ref-10">10</a></sup>。</p>
@@ -320,20 +183,142 @@ code {
 <p>第二篇则是韩国首尔国立大学（SNU）团队于 2026 年 11 月提出的 <strong>HeLM（Hierarchical Explicit Language Memory，arXiv:2611.02660，开源仓库 <a href="https://github.com/kimspacehuni/HeLM">https://github.com/kimspacehuni/HeLM</a>，项目页 <a href="https://kimspacehuni.github.io/HeLM/">https://kimspacehuni.github.io/HeLM/</a>）</strong><sup><a href="#ref-12">12</a></sup>。SNU 团队指出，大多数 VLA 隐含马尔可夫假设，仅依赖当前观测无法区分处于不同历史阶段但画面相同的场景<sup><a href="#ref-12">12</a></sup>。受人类“内心独白（Inner Monologue）”启发，HeLM 引入微调后的高层 VLM 策略（HLP）充当显式语言记忆管理器，并在两种模式间切换：每帧执行的检测模式（Detect Mode）<strong>负责比对 TaskSpec 中定义的任务关键事件；仅当检测到有效事件或全局指令发生切换时，才触发</strong>更新模式（Update Mode）改写结构化语言记忆（拆分为回合内工作记忆与跨回合情景记忆）并向底层 VLA 策略（如 π0）下发新的原子指令<sup><a href="#ref-12">12</a></sup>。</p>
 <p>这种“事件触发的自然语言压缩”有效克服了视觉历史帧随任务拉长而不断膨胀的痛点。在 10 项真实世界非马尔可夫操作任务（56 个变体）评测中，HeLM 的回合内（Intra-episode）平均子任务成功率达 85.7%，领先共享同一 HLP 骨干的视觉关键帧基线 Keyframe-HLP（72.9%）12.8 个百分点，也大幅超越将 MemoryVLA 认知记忆库适配至 π0 的潜在视觉基线 PCMB-π0（39.5%）；而在<strong>跨回合（Inter-episode）连续任务评测中，Keyframe-HLP 因视觉帧跨指令堆积崩溃至 16.6%，HeLM 依然维持了 89.2% 的成功率</strong>，同时在长程阶段比 Keyframe-HLP 最高节省 4.5 倍内存并实现 2.5 倍推理加速<sup><a href="#ref-12">12</a></sup>。HeLM 仓库的 helm_datasets/ 包开源了从 LeRobot 演示视频抽取并标注约 13 万帧事件数据集的完整流程；此外，HeLM 官方 README 明确注明，Zeng 等人的 Harness-Enhanced HELM 属于另一项独立研究，HeLM 论文并未与之进行同台对比评测<sup><a href="#ref-46">46</a></sup>。</p>
 <p>除双 HELM 外，2026 年多篇研究也从不同侧面完善了记忆与校验版图。<strong>Goal2Skill</strong>（arXiv:2604.13942<sup><a href="#ref-24">24</a></sup>）构建了“情景历史 + 工作记忆 + 错误登记表”三元结构，通过自演化校验器在子任务层面决定继续、推进或仅重写剩余规划步骤，并在向底层动作策略传输图像前用分割与跟踪模块掩膜屏蔽无关干扰物（同时保留原始图像供高层模块审查）<sup><a href="#ref-24">24</a></sup>。不过据 alphaXiv 与 OpenResearch 的独立论文摘要评注，Goal2Skill 的定量主结果目前仅依托 RMBench 选定的 5 项任务（总体平均 32.4% vs MemER 10.2%，其中 4 项领先），反射消融仅覆盖 2 项任务（28.0% vs 17.5%），且校验器更新仅给出了单个摇摆计数定性案例，尚不足以证明跨任务普适鲁棒性<sup><a href="#ref-24">24</a></sup>。<strong>SOMA</strong>（arXiv:2603.24060）聚焦面向 VLA 抗扰动的上下文自适应编排与记忆增强<sup><a href="#ref-51">51</a></sup>；而 WeaveLA（事件触发潜记忆）、ECHO（分层经验检索）、ReMem-VLA（帧与动作块级循环查询）与 Cortex（任务上下文记忆加技能约束）也分别在跨子任务信息传递和部署约束校验方向推进了长程控制边界<sup><a href="#ref-14">14</a></sup>。</p>
-<div class="table-scroll" tabindex="0"><table><thead><tr><th><strong>机制 / 论文</strong></th><th><strong>来源</strong></th><th><strong>记忆载体与表征</strong></th><th><strong>触发与校验机制</strong></th><th><strong>关键实验数据与适用边界</strong></th></tr></thead><tbody><tr><td>HELM (Zeng et al.)</td><td>arXiv:2604.18791<sup><a href="#ref-16">16</a></sup></td><td>CLIP ViT-B/32 索引关键帧 + 深度状态增量序列化文本<sup><a href="#ref-10">10</a></sup></td><td>成功/失败/每 20 步写入；记忆条件化状态校验器 SV 预测 5 步内失败概率并驱动回滚或前向恢复<sup><a href="#ref-10">10</a></sup></td><td>OpenVLA 上达 81.5% TSR（超出同 50K 预算 LoRA 12.2 pp）；单步增 ~12 ms<sup><a href="#ref-11">11</a></sup>。局限：每环境需 ~50K 步训练 SV，且真机难物理回滚<sup><a href="#ref-11">11</a></sup></td></tr><tr><td>HeLM (SNU)</td><td>arXiv:2611.02660 / github.com/kimspacehuni/HeLM<sup><a href="#ref-12">12</a></sup></td><td>显式结构化自然语言（拆分回合内工作记忆与跨回合情景记忆）<sup><a href="#ref-12">12</a></sup></td><td>VLM 在全帧 Detect 模式与事件触发 Update 模式间切换，避免视觉帧冗余堆积<sup><a href="#ref-12">12</a></sup></td><td>10 项真机非马尔可夫任务：回合内 85.7%、跨回合 89.2%（视觉关键帧基线仅 16.6%）；内存降 4.5×、推理快 2.5×<sup><a href="#ref-12">12</a></sup>。依赖 TaskSpec 与约 130k 帧事件标注<sup><a href="#ref-12">12</a></sup></td></tr><tr><td>Goal2Skill</td><td>arXiv:2604.13942<sup><a href="#ref-24">24</a></sup></td><td>三分式主动任务记忆（情景历史、工作记忆、错误登记表）<sup><a href="#ref-24">24</a></sup></td><td>自演化校验器判定完成/失败/进行中并局部修订剩余计划；底层执行器输入端叠加干扰物屏蔽掩膜<sup><a href="#ref-24">24</a></sup></td><td>5 项选定 RMBench 任务均分 32.4% vs MemER 10.2%；alphaXiv 摘要指出其消融仅测 2 项任务，尚未证明跨任务普遍鲁棒性<sup><a href="#ref-24">24</a></sup></td></tr><tr><td>SOMA</td><td>arXiv:2603.24060<sup><a href="#ref-51">51</a></sup></td><td>面向上下文自适应的增强记忆<sup><a href="#ref-51">51</a></sup></td><td>策略编排与记忆增强协同提升 VLA 抗扰动鲁棒性<sup><a href="#ref-51">51</a></sup></td><td>2026 年初探索 VLA 非参数记忆编排的代表性方案之一<sup><a href="#ref-51">51</a></sup></td></tr><tr><td>其他 2026 记忆变体</td><td>SERA 综述引述<sup><a href="#ref-14">14</a></sup></td><td>WeaveLA（事件触发潜记忆）、ECHO（分层经验检索）、ReMem-VLA（帧/块循环查询）、Cortex（上下文+技能约束）<sup><a href="#ref-14">14</a></sup></td><td>分别针对跨子任务隐式状态传递与部署期约束执行<sup><a href="#ref-14">14</a></sup></td><td>与双 HELM 共同印证“超越瞬时观测”已成 2026 长程操作核心配置<sup><a href="#ref-14">14</a></sup></td></tr></tbody></table></div>
+<section class="records">
+<article class="record"><dl>
+<div class="field"><dt>机制 / 论文</dt><dd>HELM (Zeng et al.)</dd></div>
+<div class="field"><dt>来源</dt><dd>arXiv:2604.18791<sup><a href="#ref-16">16</a></sup></dd></div>
+<div class="field"><dt>记忆载体与表征</dt><dd>CLIP ViT-B/32 索引关键帧 + 深度状态增量序列化文本<sup><a href="#ref-10">10</a></sup></dd></div>
+<div class="field"><dt>触发与校验机制</dt><dd>成功/失败/每 20 步写入；记忆条件化状态校验器 SV 预测 5 步内失败概率并驱动回滚或前向恢复<sup><a href="#ref-10">10</a></sup></dd></div>
+<div class="field"><dt>关键实验数据与适用边界</dt><dd>OpenVLA 上达 81.5% TSR（超出同 50K 预算 LoRA 12.2 pp）；单步增 ~12 ms<sup><a href="#ref-11">11</a></sup>。局限：每环境需 ~50K 步训练 SV，且真机难物理回滚<sup><a href="#ref-11">11</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>机制 / 论文</dt><dd>HeLM (SNU)</dd></div>
+<div class="field"><dt>来源</dt><dd>arXiv:2611.02660 / github.com/kimspacehuni/HeLM<sup><a href="#ref-12">12</a></sup></dd></div>
+<div class="field"><dt>记忆载体与表征</dt><dd>显式结构化自然语言（拆分回合内工作记忆与跨回合情景记忆）<sup><a href="#ref-12">12</a></sup></dd></div>
+<div class="field"><dt>触发与校验机制</dt><dd>VLM 在全帧 Detect 模式与事件触发 Update 模式间切换，避免视觉帧冗余堆积<sup><a href="#ref-12">12</a></sup></dd></div>
+<div class="field"><dt>关键实验数据与适用边界</dt><dd>10 项真机非马尔可夫任务：回合内 85.7%、跨回合 89.2%（视觉关键帧基线仅 16.6%）；内存降 4.5×、推理快 2.5×<sup><a href="#ref-12">12</a></sup>。依赖 TaskSpec 与约 130k 帧事件标注<sup><a href="#ref-12">12</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>机制 / 论文</dt><dd>Goal2Skill</dd></div>
+<div class="field"><dt>来源</dt><dd>arXiv:2604.13942<sup><a href="#ref-24">24</a></sup></dd></div>
+<div class="field"><dt>记忆载体与表征</dt><dd>三分式主动任务记忆（情景历史、工作记忆、错误登记表）<sup><a href="#ref-24">24</a></sup></dd></div>
+<div class="field"><dt>触发与校验机制</dt><dd>自演化校验器判定完成/失败/进行中并局部修订剩余计划；底层执行器输入端叠加干扰物屏蔽掩膜<sup><a href="#ref-24">24</a></sup></dd></div>
+<div class="field"><dt>关键实验数据与适用边界</dt><dd>5 项选定 RMBench 任务均分 32.4% vs MemER 10.2%；alphaXiv 摘要指出其消融仅测 2 项任务，尚未证明跨任务普遍鲁棒性<sup><a href="#ref-24">24</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>机制 / 论文</dt><dd>SOMA</dd></div>
+<div class="field"><dt>来源</dt><dd>arXiv:2603.24060<sup><a href="#ref-51">51</a></sup></dd></div>
+<div class="field"><dt>记忆载体与表征</dt><dd>面向上下文自适应的增强记忆<sup><a href="#ref-51">51</a></sup></dd></div>
+<div class="field"><dt>触发与校验机制</dt><dd>策略编排与记忆增强协同提升 VLA 抗扰动鲁棒性<sup><a href="#ref-51">51</a></sup></dd></div>
+<div class="field"><dt>关键实验数据与适用边界</dt><dd>2026 年初探索 VLA 非参数记忆编排的代表性方案之一<sup><a href="#ref-51">51</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>机制 / 论文</dt><dd>其他 2026 记忆变体</dd></div>
+<div class="field"><dt>来源</dt><dd>SERA 综述引述<sup><a href="#ref-14">14</a></sup></dd></div>
+<div class="field"><dt>记忆载体与表征</dt><dd>WeaveLA（事件触发潜记忆）、ECHO（分层经验检索）、ReMem-VLA（帧/块循环查询）、Cortex（上下文+技能约束）<sup><a href="#ref-14">14</a></sup></dd></div>
+<div class="field"><dt>触发与校验机制</dt><dd>分别针对跨子任务隐式状态传递与部署期约束执行<sup><a href="#ref-14">14</a></sup></dd></div>
+<div class="field"><dt>关键实验数据与适用边界</dt><dd>与双 HELM 共同印证“超越瞬时观测”已成 2026 长程操作核心配置<sup><a href="#ref-14">14</a></sup></dd></div>
+</dl></article>
+</section>
 <h2 id="runtime">物理 AI 运行时、ROS/MCP 中间件与多机系统工程生态</h2>
 <p>如果说前述算法论文着眼于“如何提升长程与抗扰动成功率”，那么 GitHub 上蓬勃发展的具身软件基础设施则重在解决“如何把大模型推理安全、标准、可审计地接入 ROS 1/ROS 2、物理仿真器与多异构机器人本体”<sup><a href="#ref-18">18</a></sup>。在这一工程赛道中，必须首先厘清<strong>两个同名但架构路线不同的 ROSClaw 开源项目</strong><sup><a href="#ref-20">20</a></sup>。</p>
 <p>第一个分支是 <strong>PlaiPin / OpenClaw 路线的 ROSClaw</strong>（arXiv:2603.26997，代码仓库 <a href="https://github.com/PlaiPin/rosclaw">https://github.com/PlaiPin/rosclaw</a>，615 Stars / 66 Forks，当前仓库公告正进行向多仓库拆分迁移的重构）<sup><a href="#ref-20">20</a></sup>。该框架由 Irvin Steve Cardenas 等人于 2026 年 3 月底推出，主打通过 OpenClaw 插件让用户借助 Telegram、WhatsApp、Discord 或 Slack 等即时通讯工具控制 ROS 2 机器人，并内置独立于 AI 的 /estop 急停通道<sup><a href="#ref-20">20</a></sup>。其核心学术贡献在于将“认知层与执行层边界”形式化为四元组执行层契约 C = ⟨A, O, V, L⟩：动态内省 ROS 2 计算图以暴露标准化能力清单 A（Affordance Manifest）、多传感器观测归一化器 O、依据安全策略 P 在指令下发前做出 ALLOW 或 BLOCK 裁决并附带解释理由的预执行校验器 V，以及全量结构化审计日志 L<sup><a href="#ref-19">19</a></sup>。系统抽象了 8 个标准 ROS 2 工具并支持三种传输模式（本地 DDS 延迟低于 1 ms、rosbridge WebSocket 为 5–10 ms、WebRTC P2P 为 20–100 ms）；实测表明大模型单轮推理耗时 1.3–2.3 秒（P95 不超过 3.8 秒），远高于底层通信开销<sup><a href="#ref-19">19</a></sup>。通过与 NASA JPL ROSA 进行严格对等协议（Parity Protocol）评测，该研究发现影响物理任务完成率与违规尝试率的不只是提示词工程，执行层契约设计与数字安全上限在上下文中的显式呈现同样起着关键作用<sup><a href="#ref-19">19</a></sup>。</p>
 <p>第二个分支则是由 <strong>同济大学与 SRIAS 团队主导的 ROSClaw 物理 AI 运行时</strong>（arXiv:2604.04664，官网 <a href="https://www.rosclaw.io/">https://www.rosclaw.io/</a>，代码仓库 <a href="https://github.com/ros-claw/rosclaw">https://github.com/ros-claw/rosclaw</a>，240 Stars / 34 Forks，组织名下共计 42 个仓库）<sup><a href="#ref-18">18</a></sup>。其设计理念定位为连接任意智能体与任意物理本体的双向运行时（Act → Verify → Remember → Evolve），贯彻“请求不等于执行，下发不等于完成，完成必须有证据”的工程原则——所有智能体意图必须经过能力绑定、权限仲裁与驱动调度，并返回附带物理执行证据的 ExecutionReceipt<sup><a href="#ref-18">18</a></sup>。在物理安全层面，论文 2604.04664 引入了基于 <strong>Isaac Lab 与 e-URDF 的无头数字孪生沙箱</strong>，在下发真机资源池前先完成碰撞检测与关节力矩校验，并在人形机器人、固定机械臂与移动操作平台的异构协同中实现约三分钟完成多云台协同编舞的快速部署<sup><a href="#ref-57">57</a></sup>。ros-claw 组织目前正高速孵化全栈组件，涵盖基于 USD 的自动化场景生成工具 simscene（43 Stars）、行人交互模拟 simpeople（14 Stars）、零 ROS 依赖的时空因果图记忆库 rosclaw-memory（基于 PowerMem + SeekDB，7 Stars）、宇树机器人 MuJoCo MCP 服务 unitree-mujoco-mcp（6 Stars）、物理常识防火墙 rosclaw-wiki（5 Stars），以及评测物理反馈自演化与跨本体迁移的基准 PhysicalEvoBench 与 PhysicalEvoBench-X<sup><a href="#ref-55">55</a></sup>。同时该仓库文档也保持了审慎的工程透明度：虽然本地 Codex CLI 黑盒测试已成功发现全部 22 个 MCP 工具并验证 rosclawd 能够拦截未授权真机动作，但独立 H5 验收与受控 Agent A/B 对比验收仍处于待完成（Pending）状态<sup><a href="#ref-18">18</a></sup>。</p>
 <p>在机构级开源多机协同生态方面，<strong>北京智源人工智能研究院（BAAI）</strong> 持续推动 <strong>RoboBrain 与 RoboOS</strong> 协同演进<sup><a href="#ref-58">58</a></sup>。在认知基座端，研究团队从 CVPR 2025 的 RoboBrain 1.0（arXiv:2502.21257），经结合空间指代 RoboRefer（arXiv:2506.04308）与强化微调 Reason-RFT（arXiv:2503.20752）的 RoboBrain 2.0（arXiv:2507.02029，提供 3B/7B/32B 权重及 FlagScale W8A16 压缩加速），于 2026 年 1 月升级为具备原生 3D 空间追踪（RoboTracer）与时间思维能力的 <strong>RoboBrain 2.5</strong>（arXiv:2601.14352）<sup><a href="#ref-58">58</a></sup>。在操作系统端，RoboOS 1.0（arXiv:2505.03673）通过 Redis 主从架构协调单臂、双臂、人形与轮式异构机器人在餐厅、家庭和超市等场景协作；随后的 RoboOS 2.0 升级为“SaaS + MCP”无服务器部署架构（注：此处 MCP 指 <strong>Multi-Entity Collaborative Platform</strong> 即多实体协同平台，有别于前述 Anthropic 的 Model Context Protocol），而 <strong>RoboOS-NeXT</strong>（2025 年 10 月发布）则进一步构建面向终身学习与可扩展跨本体协作的统一记忆框架<sup><a href="#ref-59">59</a></sup>。</p>
 <p>此外，传统工程工具链的生态格局在 2026 年底亦出现了明显洗牌。<strong>NASA JPL 开源的 ROSA</strong>（<a href="https://github.com/nasa-jpl/rosa">https://github.com/nasa-jpl/rosa</a>，1.7k Stars / 189 Forks，Apache-2.0，支持 pip3 install jpl-rosa）依托 LangChain 长期作为 ROS 1/ROS 2 自然语言巡检、排障与操作的事实参考标杆（Reddit r/ROS 社区讨论帖中有自称参与人类评估的开发者声称其在非平凡多跳诊断查询中比人类专家快 10–50 倍、单次调用成本约 0.25 美元，但该数值属非独立审计的社区证言）<sup><a href="#ref-52">52</a></sup>。与之形成对比的是曾高调对标“机器人领域 Android”的跨本体硬件抽象层 <strong>OpenMind OM1</strong>（<a href="https://github.com/OpenMind/OM1">https://github.com/OpenMind/OM1</a>，支持 ROS2、CycloneDDS、Zenoh、Gazebo、Prometheus 监控及宇树 Go2/G1 等全自主套装）——该仓库已于 <strong>2026 年 11 月正式宣布归档（Archived）</strong>，停止 GitHub 主动维护并将后续动态迁回 openmind.com<sup><a href="#ref-68">68</a></sup>。与此同时，Trendshift 2026 年 10 月下旬至 11 月中旬榜单反映出一批轻量级 CLI、MCP 与“Vibe Roboting”编码桥接工具正在快速吸纳开发者关注，包括 arpitg1304/robotics-agent-skills（401 Stars）、fujitatomoya/ros2ai（335 Stars）、strands-labs/robots（215 Stars）、PhysicalRSI/PhysicalRSI（145 Stars）以及直接接入 Claude Code 与 Codex 的 terminalworld/OpenRUA（59 Stars）<sup><a href="#ref-17">17</a></sup>。</p>
-<div class="table-scroll" tabindex="0"><table><thead><tr><th><strong>项目名称</strong></th><th><strong>GitHub 仓库</strong></th><th><strong>热度与状态（截至检索源日期）</strong></th><th><strong>通信协议与核心组件</strong></th><th><strong>关联论文与工程定位</strong></th></tr></thead><tbody><tr><td>NASA JPL ROSA</td><td><a href="https://github.com/nasa-jpl/rosa">https://github.com/nasa-jpl/rosa</a><sup><a href="#ref-52">52</a></sup></td><td>1.7k Stars / 189 Forks；持续活跃<sup><a href="#ref-17">17</a></sup></td><td>LangChain + ROS1/ROS2 工具封装；支持 TurtleSim 与 IsaacSim<sup><a href="#ref-52">52</a></sup></td><td>ROS 自然语言诊断与操作基准工具，常作为对等评测基线<sup><a href="#ref-19">19</a></sup></td></tr><tr><td>ROSClaw (PlaiPin / OpenClaw)</td><td><a href="https://github.com/PlaiPin/rosclaw">https://github.com/PlaiPin/rosclaw</a><sup><a href="#ref-20">20</a></sup></td><td>615 Stars / 66 Forks；正拆仓重构<sup><a href="#ref-20">20</a></sup></td><td>OpenClaw 插件 + 8 个 ROS2 工具；支持 DDS / rosbridge / WebRTC<sup><a href="#ref-19">19</a></sup></td><td>arXiv:2603.26997；形式化执行契约与大模型违规率基准测试<sup><a href="#ref-19">19</a></sup></td></tr><tr><td>ROSClaw (同济 / SRIAS)</td><td><a href="https://github.com/ros-claw/rosclaw">https://github.com/ros-claw/rosclaw</a><sup><a href="#ref-18">18</a></sup></td><td>240 Stars / 34 Forks；组织共 42 仓<sup><a href="#ref-18">18</a></sup></td><td>22 个 MCP 工具 + ExecutionReceipt + Isaac Lab e-URDF 校验沙箱<sup><a href="#ref-18">18</a></sup></td><td>arXiv:2604.04664；含 rosclaw-memory、PhysicalEvoBench 等组件（H5/A-B 验收待完成）<sup><a href="#ref-18">18</a></sup></td></tr><tr><td>BAAI RoboOS &amp; RoboBrain</td><td><a href="https://github.com/FlagOpen/RoboOS">https://github.com/FlagOpen/RoboOS</a> / RoboBrain2.5<sup><a href="#ref-59">59</a></sup></td><td>智源官方开源生态，迭代至 2.0 / 2.5<sup><a href="#ref-59">59</a></sup></td><td>Redis 主从（1.0）→ SaaS + 多实体协同平台 MCP（2.0）<sup><a href="#ref-59">59</a></sup></td><td>配套 arXiv:2505.03673、2507.02029、2601.14352 及 RoboOS-NeXT<sup><a href="#ref-61">61</a></sup></td></tr><tr><td>OpenMind OM1</td><td><a href="https://github.com/OpenMind/OM1">https://github.com/OpenMind/OM1</a><sup><a href="#ref-68">68</a></sup></td><td><strong>2026-11 已归档停止维护（MIT）</strong><sup><a href="#ref-68">68</a></sup></td><td>ROS2 / CycloneDDS / Zenoh / Gazebo；带 Prometheus 与 React Avatar<sup><a href="#ref-68">68</a></sup></td><td>跨本体模块化 HAL 先行项目，已转闭源/官网路线<sup><a href="#ref-68">68</a></sup></td></tr><tr><td>robotics-agent-skills</td><td><a href="https://github.com/arpitg1304/robotics-agent-skills">https://github.com/arpitg1304/robotics-agent-skills</a><sup><a href="#ref-17">17</a></sup></td><td>401 Stars / 52 Forks (2026-11)<sup><a href="#ref-17">17</a></sup></td><td>面向具身智能体的模块化技能库<sup><a href="#ref-17">17</a></sup></td><td>Trendshift 2026 年底热门 Python 机器人工具<sup><a href="#ref-17">17</a></sup></td></tr><tr><td>ros2ai</td><td><a href="https://github.com/fujitatomoya/ros2ai">https://github.com/fujitatomoya/ros2ai</a><sup><a href="#ref-17">17</a></sup></td><td>335 Stars / 27 Forks (2026-11)<sup><a href="#ref-17">17</a></sup></td><td>集成 LLM 的下一代 ROS 2 命令行（CLI）扩展<sup><a href="#ref-17">17</a></sup></td><td>面向开发者的轻量级 ROS 2 交互插件<sup><a href="#ref-17">17</a></sup></td></tr><tr><td>OpenRUA</td><td><a href="https://github.com/terminalworld/OpenRUA">https://github.com/terminalworld/OpenRUA</a><sup><a href="#ref-17">17</a></sup></td><td>59 Stars / 2 Forks (2026-11)<sup><a href="#ref-17">17</a></sup></td><td>支持 Claude Code 与 Codex 直接控制仿真或真机机器人<sup><a href="#ref-17">17</a></sup></td><td>新兴编码智能体控制机器人（Vibe Roboting）轻量接口<sup><a href="#ref-17">17</a></sup></td></tr></tbody></table></div>
+<section class="records">
+<article class="record"><dl>
+<div class="field"><dt>项目名称</dt><dd>NASA JPL ROSA</dd></div>
+<div class="field"><dt>GitHub 仓库</dt><dd><a href="https://github.com/nasa-jpl/rosa">https://github.com/nasa-jpl/rosa</a><sup><a href="#ref-52">52</a></sup></dd></div>
+<div class="field"><dt>热度与状态（截至检索源日期）</dt><dd>1.7k Stars / 189 Forks；持续活跃<sup><a href="#ref-17">17</a></sup></dd></div>
+<div class="field"><dt>通信协议与核心组件</dt><dd>LangChain + ROS1/ROS2 工具封装；支持 TurtleSim 与 IsaacSim<sup><a href="#ref-52">52</a></sup></dd></div>
+<div class="field"><dt>关联论文与工程定位</dt><dd>ROS 自然语言诊断与操作基准工具，常作为对等评测基线<sup><a href="#ref-19">19</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>项目名称</dt><dd>ROSClaw (PlaiPin / OpenClaw)</dd></div>
+<div class="field"><dt>GitHub 仓库</dt><dd><a href="https://github.com/PlaiPin/rosclaw">https://github.com/PlaiPin/rosclaw</a><sup><a href="#ref-20">20</a></sup></dd></div>
+<div class="field"><dt>热度与状态（截至检索源日期）</dt><dd>615 Stars / 66 Forks；正拆仓重构<sup><a href="#ref-20">20</a></sup></dd></div>
+<div class="field"><dt>通信协议与核心组件</dt><dd>OpenClaw 插件 + 8 个 ROS2 工具；支持 DDS / rosbridge / WebRTC<sup><a href="#ref-19">19</a></sup></dd></div>
+<div class="field"><dt>关联论文与工程定位</dt><dd>arXiv:2603.26997；形式化执行契约与大模型违规率基准测试<sup><a href="#ref-19">19</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>项目名称</dt><dd>ROSClaw (同济 / SRIAS)</dd></div>
+<div class="field"><dt>GitHub 仓库</dt><dd><a href="https://github.com/ros-claw/rosclaw">https://github.com/ros-claw/rosclaw</a><sup><a href="#ref-18">18</a></sup></dd></div>
+<div class="field"><dt>热度与状态（截至检索源日期）</dt><dd>240 Stars / 34 Forks；组织共 42 仓<sup><a href="#ref-18">18</a></sup></dd></div>
+<div class="field"><dt>通信协议与核心组件</dt><dd>22 个 MCP 工具 + ExecutionReceipt + Isaac Lab e-URDF 校验沙箱<sup><a href="#ref-18">18</a></sup></dd></div>
+<div class="field"><dt>关联论文与工程定位</dt><dd>arXiv:2604.04664；含 rosclaw-memory、PhysicalEvoBench 等组件（H5/A-B 验收待完成）<sup><a href="#ref-18">18</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>项目名称</dt><dd>BAAI RoboOS &amp; RoboBrain</dd></div>
+<div class="field"><dt>GitHub 仓库</dt><dd><a href="https://github.com/FlagOpen/RoboOS">https://github.com/FlagOpen/RoboOS</a> / RoboBrain2.5<sup><a href="#ref-59">59</a></sup></dd></div>
+<div class="field"><dt>热度与状态（截至检索源日期）</dt><dd>智源官方开源生态，迭代至 2.0 / 2.5<sup><a href="#ref-59">59</a></sup></dd></div>
+<div class="field"><dt>通信协议与核心组件</dt><dd>Redis 主从（1.0）→ SaaS + 多实体协同平台 MCP（2.0）<sup><a href="#ref-59">59</a></sup></dd></div>
+<div class="field"><dt>关联论文与工程定位</dt><dd>配套 arXiv:2505.03673、2507.02029、2601.14352 及 RoboOS-NeXT<sup><a href="#ref-61">61</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>项目名称</dt><dd>OpenMind OM1</dd></div>
+<div class="field"><dt>GitHub 仓库</dt><dd><a href="https://github.com/OpenMind/OM1">https://github.com/OpenMind/OM1</a><sup><a href="#ref-68">68</a></sup></dd></div>
+<div class="field"><dt>热度与状态（截至检索源日期）</dt><dd><strong>2026-11 已归档停止维护（MIT）</strong><sup><a href="#ref-68">68</a></sup></dd></div>
+<div class="field"><dt>通信协议与核心组件</dt><dd>ROS2 / CycloneDDS / Zenoh / Gazebo；带 Prometheus 与 React Avatar<sup><a href="#ref-68">68</a></sup></dd></div>
+<div class="field"><dt>关联论文与工程定位</dt><dd>跨本体模块化 HAL 先行项目，已转闭源/官网路线<sup><a href="#ref-68">68</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>项目名称</dt><dd>robotics-agent-skills</dd></div>
+<div class="field"><dt>GitHub 仓库</dt><dd><a href="https://github.com/arpitg1304/robotics-agent-skills">https://github.com/arpitg1304/robotics-agent-skills</a><sup><a href="#ref-17">17</a></sup></dd></div>
+<div class="field"><dt>热度与状态（截至检索源日期）</dt><dd>401 Stars / 52 Forks (2026-11)<sup><a href="#ref-17">17</a></sup></dd></div>
+<div class="field"><dt>通信协议与核心组件</dt><dd>面向具身智能体的模块化技能库<sup><a href="#ref-17">17</a></sup></dd></div>
+<div class="field"><dt>关联论文与工程定位</dt><dd>Trendshift 2026 年底热门 Python 机器人工具<sup><a href="#ref-17">17</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>项目名称</dt><dd>ros2ai</dd></div>
+<div class="field"><dt>GitHub 仓库</dt><dd><a href="https://github.com/fujitatomoya/ros2ai">https://github.com/fujitatomoya/ros2ai</a><sup><a href="#ref-17">17</a></sup></dd></div>
+<div class="field"><dt>热度与状态（截至检索源日期）</dt><dd>335 Stars / 27 Forks (2026-11)<sup><a href="#ref-17">17</a></sup></dd></div>
+<div class="field"><dt>通信协议与核心组件</dt><dd>集成 LLM 的下一代 ROS 2 命令行（CLI）扩展<sup><a href="#ref-17">17</a></sup></dd></div>
+<div class="field"><dt>关联论文与工程定位</dt><dd>面向开发者的轻量级 ROS 2 交互插件<sup><a href="#ref-17">17</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>项目名称</dt><dd>OpenRUA</dd></div>
+<div class="field"><dt>GitHub 仓库</dt><dd><a href="https://github.com/terminalworld/OpenRUA">https://github.com/terminalworld/OpenRUA</a><sup><a href="#ref-17">17</a></sup></dd></div>
+<div class="field"><dt>热度与状态（截至检索源日期）</dt><dd>59 Stars / 2 Forks (2026-11)<sup><a href="#ref-17">17</a></sup></dd></div>
+<div class="field"><dt>通信协议与核心组件</dt><dd>支持 Claude Code 与 Codex 直接控制仿真或真机机器人<sup><a href="#ref-17">17</a></sup></dd></div>
+<div class="field"><dt>关联论文与工程定位</dt><dd>新兴编码智能体控制机器人（Vibe Roboting）轻量接口<sup><a href="#ref-17">17</a></sup></dd></div>
+</dl></article>
+</section>
 <h2 id="labs">头部实验室基座模型与工业双/三系统架构对比</h2>
 <p>在外部 Harness 之外，头部商业实验室与开放基座生态在 2025 至 2026 年间同样把注意力集中于<strong>快慢异步分层控制</strong>与<strong>世界模型合成数据飞轮</strong><sup><a href="#ref-2">2</a></sup>，形成了四股主导技术力量。</p>
 <p><strong>Physical Intelligence（openpi 生态）</strong> 确立了流匹配（Flow-Matching）动作模型与双系统层次化的开源标准<sup><a href="#ref-29">29</a></sup>。该团队从基于逾 10,000 小时跨 7 种构型数据预训练的 π0（arXiv:2410.24164）与高效动作分词 FAST（arXiv:2501）起步，于 ICML 2025 推出 <strong>Hi Robot</strong>（arXiv:2502.19417）——高层策略与底层 π0 均从同类 PaliGemma-3B 骨干初始化，由高层模型将开放长指令及人类现场插话实时转译为底层已掌握的短语言子命令（截至检索记录，Hi Robot 项目页未单独放出专属实现与数据下载，但 π0 与 π0.5 已通过 <a href="https://github.com/Physical-Intelligence/openpi">https://github.com/Physical-Intelligence/openpi</a> 完整开源）<sup><a href="#ref-29">29</a></sup>。此后团队又推出使用约 400 小时百户真实家庭数据训练的开放世界泛化模型 π0.5（arXiv:2504.16054）与具备经验学习能力的 π*0.6（arXiv:2511），使 openpi 成为 Harness VLA、HeLM 及 AgenticRoboRL 等众多外挂框架评测底层的默认参照系<sup><a href="#ref-5">5</a></sup>。</p>
 <p><strong>NVIDIA Isaac GR00T 与 Cosmos 栈</strong> 则走出了全栈开源工业基座与合成数据飞轮的路线<sup><a href="#ref-77">77</a></sup>。在 <a href="https://github.com/NVIDIA/Isaac-GR00T">https://github.com/NVIDIA/Isaac-GR00T</a> 中，模型历经 N1、N1.5、N1.6 迭代至采用商业友好型 NVIDIA Open Model License 授权的 <strong>GR00T N1.7-3B</strong><sup><a href="#ref-77">77</a></sup>。自 N1.6 起，NVIDIA 用支持原生纵横比无填充编码的 Cosmos-Reason2-2B（及变体）取代早期的 Eagle VLM 骨干，移除旧版 4 层后置适配器并改为解冻 VLM 顶层 4 层联合训练，同时将扩散 Transformer（DiT）动作头从 16 层翻倍至 32 层、输出状态相对动作块（State-Relative Action Chunks），并预置 LIBERO_PANDA、UNITREE_G1 与 BEHAVIOR_R1_PRO 等微调配置（官方教程文档同时披露，受图像增强与随机过程非确定性影响，同配置跨轮次训练仍存在 5%–6% 的性能波动）<sup><a href="#ref-79">79</a></sup>。配合利用 Cosmos-Predict2 视频世界模型生成视频并经逆动力学模型（IDM）抽取动作转为 LeRobot 格式的 <a href="https://github.com/nvidia/gr00t-dreams">https://github.com/nvidia/gr00t-dreams</a>（633 Stars / 61 Forks），以及提供 GR00T-N1.7 与 π0.5 联合 PPO 后训练管线的 <a href="https://github.com/NVIDIA/cosmos-framework">https://github.com/NVIDIA/cosmos-framework</a>，NVIDIA 打通了“视频世界模型生成数据 → DiT 动作头微调 → 在线强化学习对齐”的闭环工程工具链<sup><a href="#ref-72">72</a></sup>。</p>
 <p><strong>Google DeepMind Gemini Robotics 系列</strong> 与 <strong>Figure AI Helix 系列</strong> 则代表了闭源受控生态下的全身灵巧操作前沿<sup><a href="#ref-1">1</a></sup>。Google DeepMind 在发布 Gemini Robotics（arXiv:2503.20020，千小时级动作数据，新任务仅需不超过 100 条演示即可实现 70% 以上成功率）与具备跨本体运动迁移（覆盖 ALOHA、双臂 Franka 与 Apptronik Apollo）及具身思维链的 Gemini Robotics 1.5 / ER 1.5（arXiv:2510.03342）及 ER 1.6 之后，推出了 <strong>Gemini Robotics 2、ER 2 与 On-Device 2</strong><sup><a href="#ref-1">1</a></sup>。根据 DeepMind 官方博客介绍，ER 2（已上线 Google AI Studio 及企业代理平台私密预览）负责多步长程推理与多机协作编排，而面向早期合作方开放的 GR 2 首次实现 Apptronik Apollo 2 从双足到 22 自由度五指灵巧手（SharpaWave）的全身统一控制，完成系结与封自封袋等高难度操作；团队并同步发表了围绕 ISO 10218:2025 人机协作标准的安全评估报告<sup><a href="#ref-1">1</a></sup>。<strong>Figure AI</strong> 在 2025 年 2 月首代 Helix（约 7B 参数 System 2 以 7–9 Hz 推理 + 80M 参数 System 1 以 200 Hz 控制 35 自由度上肢，基于约 500 小时遥操作数据训练并部署于低于 60W 的机载 Jetson Orin）的基础上，于 2026 年 2 月发布了 <strong>Helix 02</strong><sup><a href="#ref-2">2</a></sup>。Figure 官方博客显示，Helix 02 新增了在逾 20 万个并行仿真环境中、由超 1,000 小时重定向人类动作练就的 <strong>10M 参数 System 0（1 kHz 全身平衡与运动先验）</strong>，将 200 Hz 的 System 1 扩展至头部相机、掌心相机与灵敏度达 3 克的指尖触觉传感器，实现了在真实厨房场景中不中断执行 61 个连续动作（持续数分钟，含用髋部顶关抽屉、药盒单粒取药、注射器精准推注 5 ml 与杂物分拣）的全身自主控制<sup><a href="#ref-2">2</a></sup>。第三方媒体评论称 Figure AI 为此删除了 109,504 行传统 C++ 控制代码，但该具体删除行数未见于 Figure 官方新闻稿<sup><a href="#ref-2">2</a></sup>。</p>
-<div class="table-scroll" tabindex="0"><table><thead><tr><th><strong>技术生态</strong></th><th><strong>核心模型与最新代际</strong></th><th><strong>分层架构与控制频率</strong></th><th><strong>开源与获取状态</strong></th><th><strong>数据规模与技术特征</strong></th></tr></thead><tbody><tr><td>Physical Intelligence</td><td>π0 → Hi Robot → π0.5 → π*0.6<sup><a href="#ref-29">29</a></sup></td><td>流匹配 VLA + 双层 PaliGemma-3B（Hi Robot）<sup><a href="#ref-34">34</a></sup></td><td><a href="https://github.com/Physical-Intelligence/openpi">https://github.com/Physical-Intelligence/openpi</a> 开源（Hi Robot 未单列独立仓）<sup><a href="#ref-34">34</a></sup></td><td>π0 预训练 10,000+ 小时（7 种本体）；π0.5 约 400 小时百户家居数据；π*0.6 纳入经验学习<sup><a href="#ref-29">29</a></sup></td></tr><tr><td>NVIDIA Isaac</td><td>GR00T N1 → N1.5 → N1.6 → N1.7-3B + Cosmos<sup><a href="#ref-77">77</a></sup></td><td>Cosmos-Reason2-2B VLM + 32 层 DiT 动作头<sup><a href="#ref-79">79</a></sup></td><td>Isaac-GR00T / gr00t-dreams / cosmos-framework 开源（NVIDIA Open Model License）<sup><a href="#ref-72">72</a></sup></td><td>GR00T 预训练 10k+ 小时；行业汇总 cited NVIDIA 数据显示 Cosmos 用 2,000 万小时视频、DexMimicGen 11 小时生成 78 万条轨迹<sup><a href="#ref-75">75</a></sup></td></tr><tr><td>Google DeepMind</td><td>Gemini Robotics 1.5 / ER 1.6 → Gemini Robotics 2<sup><a href="#ref-1">1</a></sup></td><td>ER 2（长程推理 VLM）+ GR 2（全身 VLA）+ On-Device 2<sup><a href="#ref-1">1</a></sup></td><td>ER 2 开放 AI Studio API；GR 2 与 On-Device 2 限合作方（闭源）<sup><a href="#ref-1">1</a></sup></td><td>单任务 ≤100 条演示 &gt;70% 成功率；GR 2 控制 Apollo 2 全身与 22-DoF 五指手，对标 ISO 10218:2025 安全标准<sup><a href="#ref-1">1</a></sup></td></tr><tr><td>Figure AI</td><td>Helix (2025) → Helix 02 (2026-02)<sup><a href="#ref-2">2</a></sup></td><td>S2（语义隐变量）+ S1（200 Hz 视触融合）+ S0（1 kHz，10M 参数）<sup><a href="#ref-2">2</a></sup></td><td>商业闭源，机载 Jetson Orin 本地计算<sup><a href="#ref-87">87</a></sup></td><td>S0 训练自 &gt;1,000 小时人类动作（20 万+并行仿真）；自主连续 61 步任务，指尖触觉精度 3g<sup><a href="#ref-2">2</a></sup></td></tr></tbody></table></div>
+<section class="records">
+<article class="record"><dl>
+<div class="field"><dt>技术生态</dt><dd>Physical Intelligence</dd></div>
+<div class="field"><dt>核心模型与最新代际</dt><dd>π0 → Hi Robot → π0.5 → π*0.6<sup><a href="#ref-29">29</a></sup></dd></div>
+<div class="field"><dt>分层架构与控制频率</dt><dd>流匹配 VLA + 双层 PaliGemma-3B（Hi Robot）<sup><a href="#ref-34">34</a></sup></dd></div>
+<div class="field"><dt>开源与获取状态</dt><dd><a href="https://github.com/Physical-Intelligence/openpi">https://github.com/Physical-Intelligence/openpi</a> 开源（Hi Robot 未单列独立仓）<sup><a href="#ref-34">34</a></sup></dd></div>
+<div class="field"><dt>数据规模与技术特征</dt><dd>π0 预训练 10,000+ 小时（7 种本体）；π0.5 约 400 小时百户家居数据；π*0.6 纳入经验学习<sup><a href="#ref-29">29</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>技术生态</dt><dd>NVIDIA Isaac</dd></div>
+<div class="field"><dt>核心模型与最新代际</dt><dd>GR00T N1 → N1.5 → N1.6 → N1.7-3B + Cosmos<sup><a href="#ref-77">77</a></sup></dd></div>
+<div class="field"><dt>分层架构与控制频率</dt><dd>Cosmos-Reason2-2B VLM + 32 层 DiT 动作头<sup><a href="#ref-79">79</a></sup></dd></div>
+<div class="field"><dt>开源与获取状态</dt><dd>Isaac-GR00T / gr00t-dreams / cosmos-framework 开源（NVIDIA Open Model License）<sup><a href="#ref-72">72</a></sup></dd></div>
+<div class="field"><dt>数据规模与技术特征</dt><dd>GR00T 预训练 10k+ 小时；行业汇总 cited NVIDIA 数据显示 Cosmos 用 2,000 万小时视频、DexMimicGen 11 小时生成 78 万条轨迹<sup><a href="#ref-75">75</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>技术生态</dt><dd>Google DeepMind</dd></div>
+<div class="field"><dt>核心模型与最新代际</dt><dd>Gemini Robotics 1.5 / ER 1.6 → Gemini Robotics 2<sup><a href="#ref-1">1</a></sup></dd></div>
+<div class="field"><dt>分层架构与控制频率</dt><dd>ER 2（长程推理 VLM）+ GR 2（全身 VLA）+ On-Device 2<sup><a href="#ref-1">1</a></sup></dd></div>
+<div class="field"><dt>开源与获取状态</dt><dd>ER 2 开放 AI Studio API；GR 2 与 On-Device 2 限合作方（闭源）<sup><a href="#ref-1">1</a></sup></dd></div>
+<div class="field"><dt>数据规模与技术特征</dt><dd>单任务 ≤100 条演示 &gt;70% 成功率；GR 2 控制 Apollo 2 全身与 22-DoF 五指手，对标 ISO 10218:2025 安全标准<sup><a href="#ref-1">1</a></sup></dd></div>
+</dl></article>
+<article class="record"><dl>
+<div class="field"><dt>技术生态</dt><dd>Figure AI</dd></div>
+<div class="field"><dt>核心模型与最新代际</dt><dd>Helix (2025) → Helix 02 (2026-02)<sup><a href="#ref-2">2</a></sup></dd></div>
+<div class="field"><dt>分层架构与控制频率</dt><dd>S2（语义隐变量）+ S1（200 Hz 视触融合）+ S0（1 kHz，10M 参数）<sup><a href="#ref-2">2</a></sup></dd></div>
+<div class="field"><dt>开源与获取状态</dt><dd>商业闭源，机载 Jetson Orin 本地计算<sup><a href="#ref-87">87</a></sup></dd></div>
+<div class="field"><dt>数据规模与技术特征</dt><dd>S0 训练自 &gt;1,000 小时人类动作（20 万+并行仿真）；自主连续 61 步任务，指尖触觉精度 3g<sup><a href="#ref-2">2</a></sup></dd></div>
+</dl></article>
+</section>
 <h2 id="tradeoffs">结构性瓶颈、安全治理与技术路线权衡</h2>
 <p>综合上述论文成果与系统工程实践，当前具身智能体的架构设计正集中面对三组核心权衡与安全边界约束。</p>
 <p><strong>其一，实时推理延迟与外挂经验沉淀的双向闭环。</strong> 端到端分层神经栈（如 Helix 02）能够凭借 200 Hz 至 1 kHz 的控制频率实现全身动力学协同，但极度依赖昂贵的真实触觉与海量仿真对齐<sup><a href="#ref-2">2</a></sup>；反观调用前沿大模型的纯在线外挂 Harness（如 Harness VLA），虽然零微调即可在扰动基准上提升近 39 个百分点，却需要近 20 分钟完成单回合运行<sup><a href="#ref-5">5</a></sup>。2026 年下半年的最新探索正在架设一条折中桥梁——将非参数化 Harness 转化为“高可靠性示范轨迹的自动生产工厂”：HarnessPAI 先以跨回合演化的控制程序跑通高扰动场景，再借助严格的环境成功检查门控筛选成功轨迹，反向微调底层 π0.5 策略，使其在 LIBERO-PRO 上的单模型成功率从 34.9% 跃升至 73.7%（+38.8 个百分点）<sup><a href="#ref-15">15</a></sup>；AgenticRoboRL 用结果驱动强化学习把外部记忆搜索内化进 9B 本地模型<sup><a href="#ref-22">22</a></sup>；ROSClaw 亦把受验证的物理交互积累至本地资源池用于持续优化策略<sup><a href="#ref-57">57</a></sup>。从当前演进趋势来看，具身智能体正逐步脱离“纯端到端模型”与“纯大模型外挂”的二元对立，向“本地高频运动控制 + 轻量级记忆与状态校验（如 HELM 仅约 12 ms/step 开销） + 异步离线 Harness 演化与数据蒸馏”的混合范式收敛<sup><a href="#ref-2">2</a></sup>。</p>
